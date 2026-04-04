@@ -3,6 +3,8 @@
 Auto-generated from all feature plans. Last updated: 2026-04-04
 
 ## Active Technologies
+- Go 1.25（既有） + FFmpeg 6.x（既有）、go-chi/chi v5（既有）、golang.org/x/sync/singleflight（新增） (002-instant-seek-pregenerate)
+- mpfs /dev/shm（既有） (002-instant-seek-pregenerate)
 
 - Go 1.22+ + FFmpeg 6.x（子程序）、go-chi/chi v5（HTTP 路由） (001-hls-stream-synthesis)
 
@@ -23,6 +25,7 @@ tests/
 Go 1.22+: Follow standard conventions
 
 ## Recent Changes
+- 002-instant-seek-pregenerate: Added Go 1.25（既有） + FFmpeg 6.x（既有）、go-chi/chi v5（既有）、golang.org/x/sync/singleflight（新增）
 
 - 001-hls-stream-synthesis: Added Go 1.22+ + FFmpeg 6.x（子程序）、go-chi/chi v5（HTTP 路由）
 

@@ -43,12 +43,14 @@ func BuildFFmpegArgs(comp *media.MediaComposition, outDir string, segDuration, w
 }
 
 // BuildSegmentArgs 組裝單一分段合成的 FFmpeg 參數（用於 seek/按需生成）
+// 使用 -output_ts_offset 確保輸出 PTS 與 HLS playlist 對齊
 func BuildSegmentArgs(comp *media.MediaComposition, outPath string, segIndex, segDuration, width, height int) []string {
 	startTime := segIndex * segDuration
 
+	// 圖片用 -loop 1 不需要 seek
+	// 音檔用 input seek（-ss 在 -i 前）確保精確
 	args := []string{
 		"-y",
-		"-ss", fmt.Sprintf("%d", startTime),
 		"-loop", "1",
 		"-i", comp.Background.Path,
 		"-ss", fmt.Sprintf("%d", startTime),
@@ -70,6 +72,7 @@ func BuildSegmentArgs(comp *media.MediaComposition, outPath string, segIndex, se
 		"-c:a", "aac",
 		"-b:a", "128k",
 		"-shortest",
+		"-output_ts_offset", fmt.Sprintf("%d", startTime),
 		"-f", "mpegts",
 		outPath,
 	)

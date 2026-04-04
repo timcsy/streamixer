@@ -3,8 +3,6 @@ package handler
 import (
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -16,8 +14,9 @@ import (
 
 // StreamHandler 處理串流相關的 HTTP 請求
 type StreamHandler struct {
-	cfg    config.Config
-	loader *media.Loader
+	cfg     config.Config
+	loader  *media.Loader
+	pregen  *composer.PregenManager
 }
 
 // NewStreamHandler 建立新的串流 handler
@@ -25,6 +24,11 @@ func NewStreamHandler(cfg config.Config) *StreamHandler {
 	return &StreamHandler{
 		cfg:    cfg,
 		loader: media.NewLoader(cfg.MediaDir),
+		pregen: composer.NewPregenManager(
+			cfg.TmpDir, cfg.SegmentDuration,
+			cfg.OutputWidth, cfg.OutputHeight,
+			cfg.MaxPregenConcurrent,
+		),
 	}
 }
 
@@ -61,6 +65,9 @@ func (h *StreamHandler) PlaylistHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// 背景啟動預生成
+	h.pregen.StartPregen(comp, duration)
+
 	playlist := composer.GeneratePlaylist(duration, h.cfg.SegmentDuration)
 
 	w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
@@ -78,7 +85,6 @@ func (h *StreamHandler) SegmentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 解析分段編號
 	numStr := strings.TrimPrefix(segment, "seg_")
 	numStr = strings.TrimSuffix(numStr, ".ts")
 	segIndex, err := strconv.Atoi(numStr)
@@ -93,7 +99,6 @@ func (h *StreamHandler) SegmentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 檢查分段編號是否在範圍內
 	duration, err := composer.ProbeDuration(comp.Audio.Path)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("無法讀取音檔資訊：%v", err))
@@ -106,17 +111,21 @@ func (h *StreamHandler) SegmentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 合成分段
-	outDir := filepath.Join(h.cfg.TmpDir, id)
-	segPath := filepath.Join(outDir, segment)
+	// 優先使用預生成的分段
+	if h.pregen.IsSegmentReady(id, segIndex) {
+		segPath := h.pregen.GetSegmentPath(id, segIndex)
+		w.Header().Set("Content-Type", "video/mp2t")
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+		http.ServeFile(w, r, segPath)
+		return
+	}
 
-	// 如果分段已存在，直接回傳
-	if _, err := os.Stat(segPath); err != nil {
-		err = composer.GenerateSegment(comp, segPath, segIndex, h.cfg.SegmentDuration, h.cfg.OutputWidth, h.cfg.OutputHeight)
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, fmt.Sprintf("合成分段失敗：%v", err))
-			return
-		}
+	// Fallback：按需生成
+	segPath := h.pregen.GetSegmentPath(id, segIndex)
+	err = composer.GenerateSegment(comp, segPath, segIndex, h.cfg.SegmentDuration, h.cfg.OutputWidth, h.cfg.OutputHeight)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("合成分段失敗：%v", err))
+		return
 	}
 
 	w.Header().Set("Content-Type", "video/mp2t")
