@@ -10,7 +10,7 @@ Streamixer 是一個即時合成串流服務：將分開儲存的音檔、背景
 
 ## 現狀
 
-階段 1、2、2.5 已全部完成，階段 3 的程式碼已實作。系統使用 fMP4（CMAF）分段格式，所有分段由同一個 FFmpeg 預生成進程產出，透過 `-force_key_frames` 強制精確的分段切割點。順序播放無破音，跳轉正確，時間軸準確。快取管理（CacheManager + Sweeper）已實作，以 LRU + TTL 自動清掃 tmpfs。
+階段 1 至 4 已全部完成。Go 串流服務使用 fMP4（CMAF）分段格式、背景預生成、LRU+TTL 快取管理。WordPress 外掛提供後台素材管理（CPT + Media Library）、Shortcode 與 Gutenberg Block 嵌入、響應式播放頁面。以 docker-compose 同時運行 Streamixer + WordPress + MySQL。
 
 ## 架構
 
@@ -23,12 +23,24 @@ Streamixer 是一個即時合成串流服務：將分開儲存的音檔、背景
 - **串流協定**：HLS（HTTP Live Streaming），`#EXT-X-VERSION:7` + `#EXT-X-MAP`
 - **部署方式**：Docker 容器化，多階段建置，Alpine 基礎映像 + font-noto-cjk
 
-**程式碼結構**：
-- `src/handler/` — HTTP handlers（串流、init.mp4、上傳、範例產生、健康檢查）
-- `src/composer/` — FFmpeg 合成引擎、playlist 產生、音檔探測、PregenManager（背景預生成 + singleflight）、CacheManager（LRU + TTL）、Sweeper（背景清掃排程）
+**Go 服務結構**：
+- `src/handler/` — HTTP handlers（串流、init.mp4、上傳、範例產生、健康檢查、CORS middleware）
+- `src/composer/` — FFmpeg 合成引擎、playlist 產生、音檔探測、PregenManager、CacheManager、Sweeper
 - `src/media/` — 素材載入、驗證、資料結構
 - `src/config/` — 環境變數設定管理
-- `static/` — 測試用前端（上傳素材、HLS 播放器）
+- `static/` — 測試用前端
+
+**WordPress 外掛結構**（`wordpress/streamixer/`）：
+- `streamixer.php` — 主外掛檔案（bootstrap、Gutenberg Block 註冊、媒體按鈕）
+- `includes/` — CPT + 分類法、Settings API、Streamixer HTTP 通訊、Shortcode、前端 asset
+- `assets/js/block.js` — Gutenberg Block（純 JS，不需 build）
+- `assets/js/player.js` — HLS 播放器（hls.js 整合）
+- `templates/` — 列表頁 + 播放頁模板
+
+**部署架構**（docker-compose）：
+- `streamixer` — Go 串流合成服務（port 8081）
+- `wordpress` — WordPress + Apache（port 8082）
+- `db` — MySQL 8.0
 
 ## 路線圖
 
@@ -83,7 +95,7 @@ Streamixer 是一個即時合成串流服務：將分開儲存的音檔、背景
 
 ### 階段 3：智慧快取管理
 
-- [ ] 完成
+- [x] 完成
 
 交付：自動管理 tmpfs 中合成分段的生命週期——熱門內容保留快取，冷門內容自動清除，避免記憶體耗盡。
 前置條件：階段 2.5
@@ -96,7 +108,39 @@ Streamixer 是一個即時合成串流服務：將分開儲存的音檔、背景
 - 被清除的素材再次被請求時，重新觸發合成（對使用者透明）
 
 **成功標準：**
-- [ ] tmpfs 使用量不超過設定的容量上限
-- [ ] 無人存取的素材在 TTL 過期後自動清除
-- [ ] 清除後重新請求時，使用者體驗與首次請求一致
-- [ ] 多人同時觀看同一內容時共享同一份快取，不重複合成
+- [x] tmpfs 使用量不超過設定的容量上限
+- [x] 無人存取的素材在 TTL 過期後自動清除
+- [x] 清除後重新請求時，使用者體驗與首次請求一致
+- [x] 多人同時觀看同一內容時共享同一份快取，不重複合成
+
+### 階段 4：WordPress 外掛
+
+- [x] 完成
+
+交付：通用的 WordPress 外掛，讓使用者在後台管理素材組合（音檔+背景圖片+字幕），並在前台以良好的 UX 播放合成影片。不綁定特定用途，適用於講道、課程、podcast 等任何「音檔配圖」的場景。
+前置條件：階段 3
+
+**管理功能（後台）**：
+- 新增「Streamixer」選單，以自訂文章類型（Custom Post Type）管理素材組合
+- 新增/編輯素材組合：上傳音檔、背景圖片、字幕檔，設定標題、分類、標籤等 metadata
+- 素材上傳後自動同步至 Streamixer 服務（透過 upload API）
+- 顯示每組素材的串流狀態（預生成進度、快取狀態）
+- 設定頁：Streamixer 服務 URL、預設背景圖片、分類管理
+
+**嵌入方式（前台）**：
+- Shortcode：`[streamixer id="my-audio"]` 嵌入播放器至任何文章或頁面
+- Gutenberg Block：視覺化編輯器中可直接搜尋並選取素材組合嵌入
+- 自動嵌入：素材組合的 Custom Post Type 頁面自動顯示播放器
+
+**播放頁面**：
+- 列表頁：依日期排列，可依分類、標籤篩選，支援搜尋
+- 單則播放頁：含播放器、標題、描述、分類、標籤
+- 響應式設計：手機、平板、桌面都有良好的播放體驗
+- 播放器支援：播放/暫停、進度條跳轉、音量、全螢幕
+
+**成功標準：**
+- [x] 使用者可在 WordPress 後台上傳音檔+圖片+字幕，無需接觸伺服器
+- [x] 訪客可在前台播放頁面流暢觀看合成影片
+- [x] Shortcode 和 Gutenberg Block 皆可正常嵌入播放器
+- [ ] 手機瀏覽器上的播放體驗與桌面一致
+- [ ] 列表頁可依分類、標籤篩選與搜尋

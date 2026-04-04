@@ -1,0 +1,132 @@
+/* Streamixer 播放器樣式 */
+
+.streamixer-player-container {
+  position: relative;
+  width: 100%;
+  max-width: 960px;
+  margin: 1.5em auto;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.streamixer-video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+}
+
+.streamixer-error {
+  padding: 2em;
+  text-align: center;
+  color: #f8d7da;
+  background: #1a1a2e;
+  font-size: 0.95em;
+}
+
+.streamixer-error-msg {
+  padding: 1em;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 4px;
+  color: #856404;
+  font-size: 0.9em;
+}
+
+/* 列表頁 */
+.streamixer-archive {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1em;
+}
+
+.streamixer-archive h1 {
+  margin-bottom: 0.5em;
+}
+
+.streamixer-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.streamixer-list-item {
+  padding: 1em 0;
+  border-bottom: 1px solid #eee;
+}
+
+.streamixer-list-item a {
+  text-decoration: none;
+  color: #1a1a2e;
+  font-size: 1.1em;
+  font-weight: 500;
+}
+
+.streamixer-list-item a:hover {
+  color: #3b82f6;
+}
+
+.streamixer-list-meta {
+  font-size: 0.85em;
+  color: #666;
+  margin-top: 0.3em;
+}
+
+.streamixer-list-meta span + span::before {
+  content: " · ";
+}
+
+/* 播放頁 */
+.streamixer-single {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1em;
+}
+
+.streamixer-single h1 {
+  margin-bottom: 0.3em;
+}
+
+.streamixer-single-meta {
+  font-size: 0.9em;
+  color: #666;
+  margin-bottom: 1.5em;
+}
+
+.streamixer-single-content {
+  margin-top: 1.5em;
+  line-height: 1.7;
+}
+
+/* 分類篩選 */
+.streamixer-filters {
+  margin-bottom: 1.5em;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+}
+
+.streamixer-filter-link {
+  display: inline-block;
+  padding: 0.3em 0.8em;
+  background: #f0f0f0;
+  border-radius: 4px;
+  text-decoration: none;
+  color: #333;
+  font-size: 0.85em;
+}
+
+.streamixer-filter-link:hover,
+.streamixer-filter-link.active {
+  background: #3b82f6;
+  color: #fff;
+}
+
+/* 響應式 */
+@media (max-width: 768px) {
+  .streamixer-archive,
+  .streamixer-single {
+    padding: 0.75em;
+  }
+}

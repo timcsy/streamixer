@@ -2,13 +2,48 @@ services:
   streamixer:
     build: .
     ports:
-      - "8080:8080"
+      - "8081:8080"
     volumes:
-      - ./media:/media:ro
+      - streamixer-media:/media
     tmpfs:
       - /dev/shm/streamixer:size=512M
     environment:
       - MEDIA_DIR=/media
       - TMP_DIR=/dev/shm/streamixer
       - PORT=8080
+      - CACHE_TTL=30m
+      - CACHE_SWEEP_INTERVAL=5m
     restart: unless-stopped
+
+  wordpress:
+    image: wordpress:6-apache
+    ports:
+      - "8082:80"
+    volumes:
+      - wp-data:/var/www/html
+      - ./wordpress/streamixer:/var/www/html/wp-content/plugins/streamixer
+      - ./wordpress/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    volumes:
+      - db-data:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress
+    restart: unless-stopped
+
+volumes:
+  streamixer-media:
+  wp-data:
+  db-data:

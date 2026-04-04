@@ -35,9 +35,24 @@ func NewStreamHandler(cfg config.Config, cache *composer.CacheManager) *StreamHa
 	}
 }
 
+// CORS middleware
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Range")
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // SetupRouter 建立包含所有路由的 chi router
 func SetupRouter(h *StreamHandler, uh *UploadHandler, sh *SampleHandler) http.Handler {
 	r := chi.NewRouter()
+	r.Use(corsMiddleware)
 	r.Get("/health", HealthHandler)
 	r.Post("/upload/{id}", uh.Upload)
 	r.Get("/compositions", uh.ListCompositions)

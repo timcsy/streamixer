@@ -41,3 +41,19 @@
 - **解決方式**：playlist 改由程式碼手動計算並立即回傳（根據音檔 duration 計算分段數與時長），不依賴 FFmpeg 產生的 playlist。搭配 `-force_key_frames` 確保 FFmpeg 實際的分段時長與手動計算一致。
 - **教訓**：對於即時回應的場景，不應依賴 FFmpeg 的 HLS playlist 輸出。手動計算 playlist 並搭配 `-force_key_frames` 確保一致性，是更可控的做法。
 - **來源**：階段 2.5 實作過程中的 hls.js manifest timeout 錯誤
+
+### WordPress Gutenberg Block JS 用 editor_script 不一定載入
+
+- **理論說**：在 `register_block_type` 中指定 `editor_script` 會自動在 Gutenberg 編輯器載入該 JS 檔案。
+- **實際發生**：純 JS（非 `@wordpress/scripts` 建置）的 block，`editor_script` 指定的 script 不會被載入到 Gutenberg 編輯器。搜尋 block 時顯示「找不到符合條件的搜尋結果」，但手動在 console 載入同一 JS 檔後 block 成功註冊。
+- **解決方式**：改用 `admin_enqueue_scripts` hook，在 `post.php` 和 `post-new.php` 頁面直接 enqueue block JS。
+- **教訓**：不使用 `@wordpress/scripts` 建置的 Gutenberg Block，MUST 使用 `admin_enqueue_scripts` 而非 `editor_script` 載入 JS。`editor_script` 的行為假設 JS 已由 build 系統處理。
+- **來源**：階段 4 WordPress 外掛開發中的 block 搜尋除錯
+
+### WordPress esc_url 對已編碼的 URL 雙重編碼
+
+- **理論說**：`esc_url()` 是 WordPress 標準的 URL 跳脫函式，用於 HTML 屬性中的 URL 應該是安全的。
+- **實際發生**：中文 slug 經過 `rawurlencode()` 後（例如 `%e6%b8%ac`），再經過 `esc_url()` 會把 `%` 編碼成 `%25`，變成 `%25e6%25b8%25ac`。瀏覽器無法解析雙重編碼的 URL，HLS 請求失敗（ERR_NAME_NOT_RESOLVED 或 404）。
+- **解決方式**：在 HTML 的 `data-*` 屬性中使用 `esc_attr()` 取代 `esc_url()`，避免二次編碼。
+- **教訓**：WordPress 中含有 percent-encoded 字元的 URL，在 HTML 屬性中 MUST 使用 `esc_attr()` 而非 `esc_url()`。`esc_url()` 會重新編碼 `%` 字元，破壞已編碼的 URL。
+- **來源**：階段 4 WordPress 外掛中中文素材 slug 的播放 URL 錯誤
