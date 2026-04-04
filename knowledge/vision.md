@@ -37,10 +37,9 @@ Streamixer 是一個即時合成串流服務：將分開儲存的音檔、背景
 - `assets/js/player.js` — HLS 播放器（hls.js 整合）
 - `templates/` — 列表頁 + 播放頁模板
 
-**部署架構**（docker-compose）：
-- `streamixer` — Go 串流合成服務（port 8081）
-- `wordpress` — WordPress + Apache（port 8082）
-- `db` — MySQL 8.0
+**部署**：
+- Streamixer 以 Docker 獨立部署（docker-compose 或 `docker run`）
+- WordPress 外掛複製到既有 WordPress 的 `wp-content/plugins/` 即可使用
 
 ## 路線圖
 
@@ -144,3 +143,34 @@ Streamixer 是一個即時合成串流服務：將分開儲存的音檔、背景
 - [x] Shortcode 和 Gutenberg Block 皆可正常嵌入播放器
 - [ ] 手機瀏覽器上的播放體驗與桌面一致
 - [ ] 列表頁可依分類、標籤篩選與搜尋
+
+### 階段 5：發布準備
+
+- [ ] 完成
+
+交付：將專案整理至可公開發布的狀態，包含文件、CI/CD、安全性強化。
+前置條件：階段 4
+
+**文件**：
+- README.md：專案介紹、快速開始、架構說明、設定參數
+- LICENSE：選擇開源授權條款
+- WordPress 外掛 readme.txt（WordPress 外掛目錄標準格式）
+
+**CI/CD**：
+- GitHub Actions：推送 tag 時自動建置 Docker Image 並發布至 GitHub Container Registry（ghcr.io）
+- WordPress 外掛以 GitHub Release 的 zip 附件發布，使用者下載後解壓到 wp-content/plugins/
+
+**安全性**：
+- Upload API 加入 API Key 認證（環境變數設定）
+- CORS 改為可設定的允許來源（環境變數，預設限制為設定的 domain）
+
+**分支整理**：
+- 合併所有 feature branch 到 main
+- 建立 v1.0.0 tag
+
+**成功標準：**
+- [ ] README.md 完整且可指引新使用者從零開始部署
+- [ ] 推送 git tag 後自動產生 Docker Image 至 ghcr.io
+- [ ] WordPress 外掛可從 GitHub Release 下載 zip 安裝
+- [ ] Upload API 需要 API Key 才能存取
+- [ ] CORS 允許來源可透過環境變數設定
