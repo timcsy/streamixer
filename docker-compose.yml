@@ -1,0 +1,14 @@
+services:
+  streamixer:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./media:/media:ro
+    tmpfs:
+      - /dev/shm/streamixer:size=512M
+    environment:
+      - MEDIA_DIR=/media
+      - TMP_DIR=/dev/shm/streamixer
+      - PORT=8080
+    restart: unless-stopped

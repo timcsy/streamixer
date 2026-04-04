@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Streamixer</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      min-height: 100vh; padding: 2rem;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 1.5rem; color: #f8fafc; }
+    h2 { font-size: 1.1rem; margin-bottom: 1rem; color: #94a3b8; }
+
+    .container { max-width: 800px; margin: 0 auto; }
+
+    .card {
+      background: #1e293b; border-radius: 12px;
+      padding: 1.5rem; margin-bottom: 1.5rem;
+      border: 1px solid #334155;
+    }
+
+    .form-group { margin-bottom: 1rem; }
+    .form-group label {
+      display: block; margin-bottom: 0.4rem;
+      font-size: 0.9rem; color: #94a3b8;
+    }
+    .form-group input[type="text"] {
+      width: 100%; padding: 0.5rem 0.75rem;
+      background: #0f172a; border: 1px solid #475569;
+      border-radius: 6px; color: #e2e8f0; font-size: 0.9rem;
+    }
+    .form-group input[type="file"] {
+      font-size: 0.85rem; color: #94a3b8;
+    }
+
+    .btn {
+      display: inline-block; padding: 0.6rem 1.2rem;
+      border: none; border-radius: 6px; cursor: pointer;
+      font-size: 0.9rem; font-weight: 500; transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary { background: #3b82f6; color: #fff; }
+    .btn-secondary { background: #475569; color: #e2e8f0; }
+    .btn + .btn { margin-left: 0.5rem; }
+
+    .status {
+      margin-top: 1rem; padding: 0.75rem; border-radius: 6px;
+      font-size: 0.85rem; display: none;
+    }
+    .status.info { display: block; background: #1e3a5f; color: #93c5fd; }
+    .status.success { display: block; background: #14532d; color: #86efac; }
+    .status.error { display: block; background: #7f1d1d; color: #fca5a5; }
+
+    .player-section { display: none; }
+    .player-section.visible { display: block; }
+
+    video {
+      width: 100%; border-radius: 8px;
+      background: #000; max-height: 450px;
+    }
+
+    .composition-list {
+      display: flex; flex-wrap: wrap; gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+    .composition-item {
+      padding: 0.4rem 0.8rem; background: #334155;
+      border-radius: 6px; cursor: pointer; font-size: 0.85rem;
+      transition: background 0.2s;
+    }
+    .composition-item:hover { background: #475569; }
+    .composition-item.active { background: #3b82f6; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Streamixer</h1>
+
+    <!-- 範例素材 -->
+    <div class="card">
+      <h2>快速測試</h2>
+      <p style="font-size:0.85rem; color:#64748b; margin-bottom:1rem;">
+        產生範例素材（10 秒正弦波 + 藍色背景 + 中文字幕）並立即播放。
+      </p>
+      <button class="btn btn-secondary" id="sampleBtn" onclick="generateSample()">
+        產生範例並播放
+      </button>
+      <div class="status" id="sampleStatus"></div>
+    </div>
+
+    <!-- 上傳 -->
+    <div class="card">
+      <h2>上傳素材</h2>
+      <div class="form-group">
+        <label for="compId">素材組合 ID</label>
+        <input type="text" id="compId" placeholder="例如：sermon-20260404" value="">
+      </div>
+      <div class="form-group">
+        <label for="audioFile">音檔（MP3 / WAV）*</label>
+        <input type="file" id="audioFile" accept=".mp3,.wav">
+      </div>
+      <div class="form-group">
+        <label for="bgFile">背景圖片（JPG / PNG）*</label>
+        <input type="file" id="bgFile" accept=".jpg,.jpeg,.png">
+      </div>
+      <div class="form-group">
+        <label for="subFile">字��（SRT / VTT，選填）</label>
+        <input type="file" id="subFile" accept=".srt,.vtt">
+      </div>
+      <button class="btn btn-primary" id="uploadBtn" onclick="uploadFiles()">
+        上傳並播放
+      </button>
+      <div class="status" id="uploadStatus"></div>
+    </div>
+
+    <!-- 已有的素材 -->
+    <div class="card">
+      <h2>已有的素材組合</h2>
+      <div class="composition-list" id="compList">
+        <span style="font-size:0.85rem; color:#64748b;">載入中...</span>
+      </div>
+    </div>
+
+    <!-- 播放器 -->
+    <div class="card player-section" id="playerSection">
+      <h2 id="playerTitle">播放中</h2>
+      <video id="video" controls></video>
+      <div style="margin-top:0.75rem; font-size:0.8rem; color:#64748b;">
+        串流網址：<code id="streamUrl" style="color:#93c5fd;"></code>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let hls = null;
+    let activeComp = null;
+
+    // 載入已有素材列表
+    async function loadCompositions() {
+      try {
+        const res = await fetch('/compositions');
+        const ids = await res.json();
+        const list = document.getElementById('compList');
+        if (ids.length === 0) {
+          list.innerHTML = '<span style="font-size:0.85rem;color:#64748b;">尚無素材，請上傳或產生範例。</span>';
+          return;
+        }
+        list.innerHTML = ids.map(id =>
+          `<div class="composition-item ${id === activeComp ? 'active' : ''}"
+                onclick="playStream('${id}')">${id}</div>`
+        ).join('');
+      } catch (e) {
+        console.error('載入素材列表失敗', e);
+      }
+    }
+
+    // 產生範例
+    async function generateSample() {
+      const btn = document.getElementById('sampleBtn');
+      const status = document.getElementById('sampleStatus');
+      btn.disabled = true;
+      btn.textContent = '產生中...';
+      setStatus(status, 'info', '正在用 FFmpeg 產生範例素材...');
+
+      try {
+        const res = await fetch('/sample', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        setStatus(status, 'success', `範例素材已產生！ID: ${data.id}`);
+        playStream(data.id);
+        loadCompositions();
+      } catch (e) {
+        setStatus(status, 'error', `失敗：${e.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '產生範例並播放';
+      }
+    }
+
+    // 上傳檔案
+    async function uploadFiles() {
+      const id = document.getElementById('compId').value.trim();
+      const status = document.getElementById('uploadStatus');
+      const btn = document.getElementById('uploadBtn');
+
+      if (!id) { setStatus(status, 'error', '請輸入素材組合 ID'); return; }
+
+      const audio = document.getElementById('audioFile').files[0];
+      const bg = document.getElementById('bgFile').files[0];
+      const sub = document.getElementById('subFile').files[0];
+
+      if (!audio || !bg) {
+        setStatus(status, 'error', '音檔與背景圖片為必填');
+        return;
+      }
+
+      const form = new FormData();
+      form.append('audio', audio);
+      form.append('background', bg);
+      if (sub) form.append('subtitle', sub);
+
+      btn.disabled = true;
+      btn.textContent = '上傳中...';
+      setStatus(status, 'info', '正在上傳...');
+
+      try {
+        const res = await fetch(`/upload/${encodeURIComponent(id)}`, {
+          method: 'POST', body: form
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        setStatus(status, 'success', `上傳成功！已儲存：${data.saved.join(', ')}`);
+        playStream(data.id);
+        loadCompositions();
+      } catch (e) {
+        setStatus(status, 'error', `上傳失敗：${e.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '上傳並播放';
+      }
+    }
+
+    // 播放 HLS 串流
+    function playStream(id) {
+      activeComp = id;
+      const url = `/stream/${id}/index.m3u8`;
+      const video = document.getElementById('video');
+      const section = document.getElementById('playerSection');
+      const title = document.getElementById('playerTitle');
+      const urlDisplay = document.getElementById('streamUrl');
+
+      section.classList.add('visible');
+      title.textContent = `播放中：${id}`;
+      urlDisplay.textContent = url;
+
+      // 停止舊的串流
+      if (hls) { hls.destroy(); hls = null; }
+
+      if (Hls.isSupported()) {
+        hls = new Hls();
+        hls.loadSource(url);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
+        hls.on(Hls.Events.ERROR, (_, data) => {
+          if (data.fatal) console.error('HLS 錯誤', data);
+        });
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Safari 原生支援
+        video.src = url;
+        video.addEventListener('loadedmetadata', () => video.play(), { once: true });
+      } else {
+        alert('此瀏覽器不支援 HLS 播放');
+      }
+
+      loadCompositions(); // 更新 active 狀態
+    }
+
+    function setStatus(el, type, msg) {
+      el.className = `status ${type}`;
+      el.textContent = msg;
+    }
+
+    // 初始化
+    loadCompositions();
+  </script>
+</body>
+</html>

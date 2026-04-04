@@ -1,0 +1,12 @@
+.git/
+.specify/
+.claude/
+specs/
+tests/
+knowledge/
+AGENTS.md
+CLAUDE.md
+*.md
+!go.mod
+!go.sum
+.DS_Store
