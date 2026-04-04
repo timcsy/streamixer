@@ -17,10 +17,11 @@ type StreamHandler struct {
 	cfg    config.Config
 	loader *media.Loader
 	pregen *composer.PregenManager
+	cache  *composer.CacheManager
 }
 
 // NewStreamHandler 建立新的串流 handler
-func NewStreamHandler(cfg config.Config) *StreamHandler {
+func NewStreamHandler(cfg config.Config, cache *composer.CacheManager) *StreamHandler {
 	return &StreamHandler{
 		cfg:    cfg,
 		loader: media.NewLoader(cfg.MediaDir),
@@ -28,7 +29,9 @@ func NewStreamHandler(cfg config.Config) *StreamHandler {
 			cfg.TmpDir, cfg.SegmentDuration,
 			cfg.OutputWidth, cfg.OutputHeight,
 			cfg.MaxPregenConcurrent,
+			cache,
 		),
+		cache: cache,
 	}
 }
 
@@ -68,6 +71,7 @@ func (h *StreamHandler) PlaylistHandler(w http.ResponseWriter, r *http.Request) 
 
 	// 背景啟動預生成
 	h.pregen.StartPregen(comp, duration)
+	h.cache.Touch(id)
 
 	// 立即回傳手動計算的 playlist（顯示完整時長，不等 FFmpeg）
 	// 分段由預生成在背景產生，因為 -force_key_frames 確保切割點精確匹配
@@ -102,6 +106,7 @@ func (h *StreamHandler) InitHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.cache.Touch(id)
 	initPath := h.pregen.GetInitPath(id)
 	w.Header().Set("Content-Type", "video/mp4")
 	w.Header().Set("Cache-Control", "public, max-age=3600")
@@ -144,7 +149,9 @@ func (h *StreamHandler) SegmentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 等待預生成產出該分段（順序播放時幾乎不用等，跳轉時最多等一個分段的合成時間）
+	h.cache.Touch(id)
+
+	// 等待預生成產出該分段
 	if err := h.pregen.WaitForSegment(id, segIndex, 30); err != nil {
 		writeError(w, http.StatusServiceUnavailable, fmt.Sprintf("分段 %d 尚未就緒：%v", segIndex, err))
 		return

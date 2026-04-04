@@ -50,7 +50,7 @@ func TestFmp4_PregenProducesInitAndM4S(t *testing.T) {
 	tmpDir, comp := setupFmp4TestMedia(t)
 	outDir := filepath.Join(tmpDir, "output")
 
-	mgr := composer.NewPregenManager(outDir, 6, 320, 240, 3)
+	mgr := composer.NewPregenManager(outDir, 6, 320, 240, 3, nil)
 
 	duration, err := composer.ProbeDuration(comp.Audio.Path)
 	if err != nil {
@@ -121,7 +121,7 @@ func TestFmp4_PlaylistContainsExtXMap(t *testing.T) {
 		MaxPregenConcurrent: 3,
 	}
 
-	h := handler.NewStreamHandler(cfg)
+	h := handler.NewStreamHandler(cfg, composer.NewCacheManager(cfg.TmpDir, 10*time.Minute, 0))
 	uh := handler.NewUploadHandler(cfg)
 	sh := handler.NewSampleHandler(cfg)
 	router := handler.SetupRouter(h, uh, sh)
@@ -161,7 +161,7 @@ func TestFmp4_InitEndpoint(t *testing.T) {
 		MaxPregenConcurrent: 3,
 	}
 
-	h := handler.NewStreamHandler(cfg)
+	h := handler.NewStreamHandler(cfg, composer.NewCacheManager(cfg.TmpDir, 10*time.Minute, 0))
 	uh := handler.NewUploadHandler(cfg)
 	sh := handler.NewSampleHandler(cfg)
 	router := handler.SetupRouter(h, uh, sh)
@@ -202,7 +202,7 @@ func TestFmp4_SegmentContentType(t *testing.T) {
 		MaxPregenConcurrent: 3,
 	}
 
-	h := handler.NewStreamHandler(cfg)
+	h := handler.NewStreamHandler(cfg, composer.NewCacheManager(cfg.TmpDir, 10*time.Minute, 0))
 	uh := handler.NewUploadHandler(cfg)
 	sh := handler.NewSampleHandler(cfg)
 	router := handler.SetupRouter(h, uh, sh)

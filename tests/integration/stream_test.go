@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/timcsy/streamixer/src/composer"
 	"github.com/timcsy/streamixer/src/config"
@@ -113,7 +114,7 @@ func TestPlaylistHandler_ReturnsValidM3U8(t *testing.T) {
 		OutputHeight:    240,
 	}
 
-	h := handler.NewStreamHandler(cfg)
+	h := handler.NewStreamHandler(cfg, composer.NewCacheManager(cfg.TmpDir, 10*time.Minute, 0))
 	uh := handler.NewUploadHandler(cfg)
 	sh := handler.NewSampleHandler(cfg)
 	router := handler.SetupRouter(h, uh, sh)
@@ -146,7 +147,7 @@ func TestSegmentHandler_ReturnsValidM4S(t *testing.T) {
 		MaxPregenConcurrent: 3,
 	}
 
-	h := handler.NewStreamHandler(cfg)
+	h := handler.NewStreamHandler(cfg, composer.NewCacheManager(cfg.TmpDir, 10*time.Minute, 0))
 	uh := handler.NewUploadHandler(cfg)
 	sh := handler.NewSampleHandler(cfg)
 	router := handler.SetupRouter(h, uh, sh)

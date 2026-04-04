@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/timcsy/streamixer/src/composer"
 	"github.com/timcsy/streamixer/src/config"
 	"github.com/timcsy/streamixer/src/handler"
 )
@@ -36,7 +38,7 @@ func TestPlaylistEndpoint_NotFound(t *testing.T) {
 		OutputHeight:    240,
 	}
 
-	h := handler.NewStreamHandler(cfg)
+	h := handler.NewStreamHandler(cfg, composer.NewCacheManager(cfg.TmpDir, 10*time.Minute, 0))
 	uh := handler.NewUploadHandler(cfg)
 	sh := handler.NewSampleHandler(cfg)
 	router := handler.SetupRouter(h, uh, sh)
@@ -60,7 +62,7 @@ func TestSegmentEndpoint_NotFound(t *testing.T) {
 		OutputHeight:    240,
 	}
 
-	h := handler.NewStreamHandler(cfg)
+	h := handler.NewStreamHandler(cfg, composer.NewCacheManager(cfg.TmpDir, 10*time.Minute, 0))
 	uh := handler.NewUploadHandler(cfg)
 	sh := handler.NewSampleHandler(cfg)
 	router := handler.SetupRouter(h, uh, sh)

@@ -12,7 +12,7 @@ import (
 
 func TestPregenManager_StartAndStatus(t *testing.T) {
 	tmpDir := t.TempDir()
-	mgr := composer.NewPregenManager(tmpDir, 6, 320, 240, 3)
+	mgr := composer.NewPregenManager(tmpDir, 6, 320, 240, 3, nil)
 
 	status := mgr.GetStatus("nonexistent")
 	if status != nil {
@@ -22,7 +22,7 @@ func TestPregenManager_StartAndStatus(t *testing.T) {
 
 func TestPregenManager_IsSegmentReady(t *testing.T) {
 	tmpDir := t.TempDir()
-	mgr := composer.NewPregenManager(tmpDir, 6, 320, 240, 3)
+	mgr := composer.NewPregenManager(tmpDir, 6, 320, 240, 3, nil)
 
 	if mgr.IsSegmentReady("test", 0) {
 		t.Error("未生成的分段應回傳 false")
@@ -46,7 +46,7 @@ func TestPregenManager_IsSegmentReady(t *testing.T) {
 
 func TestPregenManager_Singleflight(t *testing.T) {
 	tmpDir := t.TempDir()
-	mgr := composer.NewPregenManager(tmpDir, 6, 320, 240, 3)
+	mgr := composer.NewPregenManager(tmpDir, 6, 320, 240, 3, nil)
 
 	comp := &media.MediaComposition{
 		ID:         "singleflight-test",

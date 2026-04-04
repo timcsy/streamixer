@@ -47,7 +47,7 @@ func TestPregenConcurrentMultipleCompositions(t *testing.T) {
 	tmpDir := t.TempDir()
 	outDir := filepath.Join(tmpDir, "output")
 
-	mgr := composer.NewPregenManager(outDir, 6, 320, 240, 3)
+	mgr := composer.NewPregenManager(outDir, 6, 320, 240, 3, nil)
 
 	// 建立 3 個不同素材
 	comps := make([]*media.MediaComposition, 3)
@@ -114,7 +114,7 @@ func TestPregenFailureFallback(t *testing.T) {
 	tmpDir := t.TempDir()
 	outDir := filepath.Join(tmpDir, "output")
 
-	mgr := composer.NewPregenManager(outDir, 6, 320, 240, 3)
+	mgr := composer.NewPregenManager(outDir, 6, 320, 240, 3, nil)
 
 	// 用不存在的檔案觸發預生成失敗
 	comp := &media.MediaComposition{
@@ -144,7 +144,7 @@ func TestPregenFullWorkflow(t *testing.T) {
 	tmpDir, comp := setupPregenTestMedia(t)
 	outDir := filepath.Join(tmpDir, "output")
 
-	mgr := composer.NewPregenManager(outDir, 6, 320, 240, 3)
+	mgr := composer.NewPregenManager(outDir, 6, 320, 240, 3, nil)
 
 	duration, err := composer.ProbeDuration(comp.Audio.Path)
 	if err != nil {

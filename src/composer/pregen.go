@@ -46,10 +46,13 @@ type PregenManager struct {
 
 	// 並發限制
 	sem chan struct{}
+
+	// 快取管理
+	cache *CacheManager
 }
 
 // NewPregenManager 建立預生成管理器
-func NewPregenManager(tmpDir string, segDuration, width, height, maxConcurrent int) *PregenManager {
+func NewPregenManager(tmpDir string, segDuration, width, height, maxConcurrent int, cache *CacheManager) *PregenManager {
 	if maxConcurrent <= 0 {
 		maxConcurrent = 3
 	}
@@ -60,6 +63,7 @@ func NewPregenManager(tmpDir string, segDuration, width, height, maxConcurrent i
 		outputHeight:    height,
 		tasks:           make(map[string]*PregenTask),
 		sem:             make(chan struct{}, maxConcurrent),
+		cache:           cache,
 	}
 }
 
@@ -77,7 +81,6 @@ func (m *PregenManager) StartPregen(comp *media.MediaComposition, duration float
 		}
 
 		m.mu.Lock()
-		// 如果已經完成或正在執行，不重複啟動
 		if existing, ok := m.tasks[comp.ID]; ok {
 			if existing.Status == PregenCompleted || existing.Status == PregenRunning {
 				m.mu.Unlock()
@@ -86,6 +89,10 @@ func (m *PregenManager) StartPregen(comp *media.MediaComposition, duration float
 		}
 		m.tasks[comp.ID] = task
 		m.mu.Unlock()
+
+		if m.cache != nil {
+			m.cache.SetActive(comp.ID, true)
+		}
 
 		go m.runPregen(comp, task)
 		return nil, nil
@@ -112,6 +119,9 @@ func (m *PregenManager) runPregen(comp *media.MediaComposition, task *PregenTask
 		task.Status = PregenFailed
 		task.Error = fmt.Errorf("預生成失敗：%w", err)
 		m.mu.Unlock()
+		if m.cache != nil {
+			m.cache.SetActive(comp.ID, false)
+		}
 		log.Printf("預生成 %s 失敗：%v", comp.ID, err)
 		return
 	}
@@ -119,6 +129,10 @@ func (m *PregenManager) runPregen(comp *media.MediaComposition, task *PregenTask
 	m.mu.Lock()
 	task.Status = PregenCompleted
 	m.mu.Unlock()
+	if m.cache != nil {
+		m.cache.SetActive(comp.ID, false)
+		m.cache.Touch(comp.ID)
+	}
 	log.Printf("預生成 %s 完成（%d 分段）", comp.ID, task.TotalSegments)
 }
 
