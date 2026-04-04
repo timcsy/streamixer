@@ -81,7 +81,7 @@ func TestFullStreamWorkflow(t *testing.T) {
 	}
 
 	// 合成第一個分段
-	segPath := filepath.Join(cfg.TmpDir, "test-sermon", "seg_000.ts")
+	segPath := filepath.Join(cfg.TmpDir, "test-sermon", "seg_000.m4s")
 	os.MkdirAll(filepath.Dir(segPath), 0755)
 	err = composer.GenerateSegment(comp, segPath, 0, cfg.SegmentDuration, cfg.OutputWidth, cfg.OutputHeight)
 	if err != nil {
@@ -133,16 +133,17 @@ func TestPlaylistHandler_ReturnsValidM3U8(t *testing.T) {
 	}
 }
 
-func TestSegmentHandler_ReturnsValidTS(t *testing.T) {
+func TestSegmentHandler_ReturnsValidM4S(t *testing.T) {
 	tmpDir, cleanup := setupTestMedia(t)
 	defer cleanup()
 
 	cfg := config.Config{
-		MediaDir:        filepath.Join(tmpDir, "media"),
-		TmpDir:          filepath.Join(tmpDir, "output"),
-		SegmentDuration: 6,
-		OutputWidth:     320,
-		OutputHeight:    240,
+		MediaDir:            filepath.Join(tmpDir, "media"),
+		TmpDir:              filepath.Join(tmpDir, "output"),
+		SegmentDuration:     6,
+		OutputWidth:         320,
+		OutputHeight:        240,
+		MaxPregenConcurrent: 3,
 	}
 
 	h := handler.NewStreamHandler(cfg)
@@ -150,15 +151,21 @@ func TestSegmentHandler_ReturnsValidTS(t *testing.T) {
 	sh := handler.NewSampleHandler(cfg)
 	router := handler.SetupRouter(h, uh, sh)
 
-	req := httptest.NewRequest("GET", "/stream/test-sermon/seg_000.ts", nil)
+	// 先請求 playlist 觸發預生成
+	req := httptest.NewRequest("GET", "/stream/test-sermon/index.m3u8", nil)
 	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	// 請求分段（會等待預生成產出）
+	req = httptest.NewRequest("GET", "/stream/test-sermon/seg_000.m4s", nil)
+	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("預期 200，實際 %d：%s", w.Code, w.Body.String())
 	}
-	if w.Header().Get("Content-Type") != "video/mp2t" {
-		t.Errorf("Content-Type 應為 video/mp2t，實際 %s", w.Header().Get("Content-Type"))
+	if w.Header().Get("Content-Type") != "video/mp4" {
+		t.Errorf("Content-Type 應為 video/mp4，實際 %s", w.Header().Get("Content-Type"))
 	}
 	if w.Body.Len() == 0 {
 		t.Error("分段回應不應為空")

@@ -6,7 +6,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/timcsy/streamixer/src/media"
 	"golang.org/x/sync/singleflight"
@@ -120,10 +122,10 @@ func (m *PregenManager) runPregen(comp *media.MediaComposition, task *PregenTask
 	log.Printf("預生成 %s 完成（%d 分段）", comp.ID, task.TotalSegments)
 }
 
-// IsSegmentReady 檢查分段是否已預生成
+// IsSegmentReady 檢查 fMP4 分段是否已預生成
 func (m *PregenManager) IsSegmentReady(compositionID string, segIndex int) bool {
 	outDir := filepath.Join(m.tmpDir, compositionID)
-	segPath := filepath.Join(outDir, fmt.Sprintf("seg_%03d.ts", segIndex))
+	segPath := filepath.Join(outDir, fmt.Sprintf("seg_%03d.m4s", segIndex))
 
 	info, err := os.Stat(segPath)
 	if err != nil {
@@ -132,9 +134,105 @@ func (m *PregenManager) IsSegmentReady(compositionID string, segIndex int) bool 
 	return info.Size() > 0
 }
 
-// GetSegmentPath 取得預生成分段的路徑
+// GetSegmentPath 取得預生成 fMP4 分段的路徑
 func (m *PregenManager) GetSegmentPath(compositionID string, segIndex int) string {
-	return filepath.Join(m.tmpDir, compositionID, fmt.Sprintf("seg_%03d.ts", segIndex))
+	return filepath.Join(m.tmpDir, compositionID, fmt.Sprintf("seg_%03d.m4s", segIndex))
+}
+
+// IsInitReady 檢查 init.mp4 是否已存在
+func (m *PregenManager) IsInitReady(compositionID string) bool {
+	initPath := filepath.Join(m.tmpDir, compositionID, "init.mp4")
+	info, err := os.Stat(initPath)
+	if err != nil {
+		return false
+	}
+	return info.Size() > 0
+}
+
+// GetInitPath 取得 init.mp4 的路徑
+func (m *PregenManager) GetInitPath(compositionID string) string {
+	return filepath.Join(m.tmpDir, compositionID, "init.mp4")
+}
+
+// GetPlaylistPath 取得 FFmpeg 產生的 playlist 路徑
+func (m *PregenManager) GetPlaylistPath(compositionID string) string {
+	return filepath.Join(m.tmpDir, compositionID, "index.m3u8")
+}
+
+// WaitForPlaylist 等待預生成產生 playlist（至少有一個分段），最多等待 timeoutSec 秒
+func (m *PregenManager) WaitForPlaylist(compositionID string, timeoutSec int) error {
+	playlistPath := m.GetPlaylistPath(compositionID)
+
+	for i := 0; i < timeoutSec*10; i++ {
+		data, err := os.ReadFile(playlistPath)
+		if err == nil {
+			content := string(data)
+			// EVENT 模式下，FFmpeg 邊合成邊寫入 playlist
+			// 只要有至少一個 .m4s 分段就可以開始播放
+			if strings.Contains(content, ".m4s") {
+				return nil
+			}
+		}
+
+		// 檢查是否已失敗
+		m.mu.RLock()
+		task := m.tasks[compositionID]
+		m.mu.RUnlock()
+		if task != nil && task.Status == PregenFailed {
+			return task.Error
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	return fmt.Errorf("等待 playlist 逾時（%d 秒）", timeoutSec)
+}
+
+// WaitForInit 等待 init.mp4 就緒，最多等待 timeoutSec 秒
+func (m *PregenManager) WaitForInit(compositionID string, timeoutSec int) error {
+	for i := 0; i < timeoutSec*10; i++ {
+		if m.IsInitReady(compositionID) {
+			return nil
+		}
+
+		m.mu.RLock()
+		task := m.tasks[compositionID]
+		m.mu.RUnlock()
+		if task != nil && task.Status == PregenFailed {
+			return task.Error
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+	return fmt.Errorf("等待 init.mp4 逾時（%d 秒）", timeoutSec)
+}
+
+// WaitForSegment 等待指定分段就緒，最多等待 timeoutSec 秒
+func (m *PregenManager) WaitForSegment(compositionID string, segIndex int, timeoutSec int) error {
+	for i := 0; i < timeoutSec*10; i++ {
+		if m.IsSegmentReady(compositionID, segIndex) {
+			return nil
+		}
+
+		m.mu.RLock()
+		task := m.tasks[compositionID]
+		m.mu.RUnlock()
+		if task != nil && task.Status == PregenFailed {
+			return task.Error
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+	return fmt.Errorf("等待分段 %d 逾時（%d 秒）", segIndex, timeoutSec)
+}
+
+// IsPlaylistComplete 檢查 playlist 是否已完成（包含 EXT-X-ENDLIST）
+func (m *PregenManager) IsPlaylistComplete(compositionID string) bool {
+	data, err := os.ReadFile(m.GetPlaylistPath(compositionID))
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(data), "#EXT-X-ENDLIST")
 }
 
 // GetStatus 取得預生成任務狀態

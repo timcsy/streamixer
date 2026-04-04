@@ -31,14 +31,14 @@ func TestPregenManager_IsSegmentReady(t *testing.T) {
 	// 模擬預生成完成
 	segDir := filepath.Join(tmpDir, "test")
 	os.MkdirAll(segDir, 0755)
-	os.WriteFile(filepath.Join(segDir, "seg_000.ts"), []byte("fake segment data"), 0644)
+	os.WriteFile(filepath.Join(segDir, "seg_000.m4s"), []byte("fake segment data"), 0644)
 
 	if !mgr.IsSegmentReady("test", 0) {
 		t.Error("已存在的分段應回傳 true")
 	}
 
 	// 空檔案應回傳 false
-	os.WriteFile(filepath.Join(segDir, "seg_001.ts"), []byte(""), 0644)
+	os.WriteFile(filepath.Join(segDir, "seg_001.m4s"), []byte(""), 0644)
 	if mgr.IsSegmentReady("test", 1) {
 		t.Error("空檔案應回傳 false")
 	}

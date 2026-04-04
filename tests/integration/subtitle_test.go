@@ -60,7 +60,7 @@ func TestSubtitleComposition(t *testing.T) {
 	tmpDir, comp := setupTestMediaWithSubtitle(t)
 
 	outDir := filepath.Join(tmpDir, "output")
-	segPath := filepath.Join(outDir, "seg_000.ts")
+	segPath := filepath.Join(outDir, "seg_000.m4s")
 	os.MkdirAll(outDir, 0755)
 
 	err := composer.GenerateSegment(comp, segPath, 0, 6, 320, 240)
@@ -99,7 +99,7 @@ func TestNoSubtitle_StillWorks(t *testing.T) {
 	comp.Subtitle = nil // 移除字幕
 
 	outDir := filepath.Join(tmpDir, "output")
-	segPath := filepath.Join(outDir, "seg_000.ts")
+	segPath := filepath.Join(outDir, "seg_000.m4s")
 	os.MkdirAll(outDir, 0755)
 
 	err := composer.GenerateSegment(comp, segPath, 0, 6, 320, 240)

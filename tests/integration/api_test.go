@@ -65,7 +65,7 @@ func TestSegmentEndpoint_NotFound(t *testing.T) {
 	sh := handler.NewSampleHandler(cfg)
 	router := handler.SetupRouter(h, uh, sh)
 
-	req := httptest.NewRequest("GET", "/stream/nonexistent/seg_000.ts", nil)
+	req := httptest.NewRequest("GET", "/stream/nonexistent/seg_000.m4s", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 

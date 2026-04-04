@@ -10,21 +10,22 @@ Streamixer 是一個即時合成串流服務：將分開儲存的音檔、背景
 
 ## 現狀
 
-階段 1 已完成，階段 2 的程式碼已實作。系統支援背景預生成（PregenManager）、singleflight 並發控制、按需生成 fallback 與 `-output_ts_offset` 時間戳修正。但 MPEG-TS 分段格式在切換時存在音訊不連續��破音），待階段 2.5（fMP4）解決後才能勾選階段 2 完成。
+階段 1 已完成，階段 2 與 2.5 的程式碼已實作。系統使用 fMP4（CMAF）分段格式，所有分段由同一個 FFmpeg 預生成進程產出（無按需生成），透過 `-force_key_frames` 強制精確的分段切割點。分段請求以 WaitForSegment 等待預生成完成。待使用者確認播放體驗後可勾選階段 2 與 2.5 完成。
 
 ## 架構
 
 - **語言**：Go 1.25
 - **HTTP 路由**：go-chi/chi v5
-- **媒體合成**：FFmpeg 子程序，以 `-preset ultrafast -tune stillimage` 合成
+- **媒體合成**：FFmpeg 子程序，以 `-preset ultrafast -tune stillimage -force_key_frames` 合成
+- **分段格式**：fMP4 / CMAF（`-hls_segment_type fmp4`），init.mp4 + .m4s 分段
 - **字幕處理**：燒入（burned-in），透過 FFmpeg `-vf subtitles=` 濾鏡
 - **暫存**：tmpfs（/dev/shm），避免磁碟 I/O
-- **串流協定**：HLS（HTTP Live Streaming），相容性廣，適合 WordPress 嵌入播放
-- **部署方式**：Docker 容器化，多階段建置，Alpine 基礎映像
+- **串流協定**：HLS（HTTP Live Streaming），`#EXT-X-VERSION:7` + `#EXT-X-MAP`
+- **部署方式**：Docker 容器化，多階段建置，Alpine 基礎映像 + font-noto-cjk
 
 **程式碼結構**：
-- `src/handler/` — HTTP handlers（串流、上傳、範例產生、健康檢查、錯誤回應）
-- `src/composer/` — FFmpeg 合成引擎、playlist 產生、音檔探測、PregenManager（背景預生成，singleflight 並發控制）
+- `src/handler/` — HTTP handlers（串流、init.mp4、上傳、範例產生、健康檢查）
+- `src/composer/` — FFmpeg 合成引擎、playlist 產生、音檔探測、PregenManager（背景預生成 + WaitForSegment/WaitForInit + singleflight）
 - `src/media/` — 素材載入、驗證、資料結構
 - `src/config/` — 環境變數設定管理
 - `static/` — 測試用前端（上傳素材、HLS 播放器）
@@ -47,18 +48,18 @@ Streamixer 是一個即時合成串流服務：將分開儲存的音檔、背景
 
 - [ ] 完成
 
-交付：採用混合策略解決跳轉時音訊偏移問題，同時確保長音檔（1 小時以上）不需等待漫長的首次載入。
+交付：背景預生成所有分段，分段請求等待預生成完成，確保長音檔流暢播放。
 前置條件：階段 1
 
 **策略**：
-- 首次請求 playlist 時，背景啟動 FFmpeg 預生成所有分段（不阻塞回應）
-- 使用者請求分段時：已生成 → 直接回傳（零延遲）；尚未生成 → 按需生成該單一分段
-- 正常順序播放時，背景任務跑在使用者前面，大部分分段即時可用
-- Seek 到尚未生成的位置時，最多等待一個分段的合成時間（< 1 秒）
+- 首次請求 playlist 時，立即回傳手動計算的 playlist（顯示完整時長），同時背景啟動 FFmpeg 預生成
+- 使用者請求分段時：已生成 → 直接回傳；尚未生成 → 等待預生成完成（WaitForSegment）
+- 順序播放時預生成跑在使用者前面，等待時間極短
+- 使用 singleflight 防止同一素材重複預生成，semaphore 限制並發數
 
 **成功標準：**
 - [ ] 順序播放時分段切換無中斷
-- [ ] 跳轉後音訊位置與 playlist 宣告的時間戳一致，無偏移
+- [ ] 跳轉後音訊位置正確
 - [ ] 1 小時音檔的首次 playlist 請求在 5 秒內回應
 - [ ] 跳轉到任意位置後 2 秒內開始播放
 
@@ -66,13 +67,14 @@ Streamixer 是一個即時合成串流服務：將分開儲存的音檔、背景
 
 - [ ] 完成
 
-交付：將 HLS 分段格式從 MPEG-TS（.ts）改為 fragmented MP4（fMP4 / CMAF），徹底消除分段切換時的音訊不連續（破音）。
+交付：使用 fMP4（CMAF）分段格式，消除分段切換時的音訊不連續。
 前置條件：階段 2
 
-**動機**：
-- .ts 分段在切換時，每段需要重新初始化 AAC 解碼器，造成微小的音訊不連續
-- fMP4 使用共享的初始化段（init segment），解碼器狀態在分段之間連續，音訊銜接無縫
-- fMP4 是現代 HLS（CMAF）的標準做法，hls.js 完全支援
+**策略**：
+- FFmpeg 使用 `-hls_segment_type fmp4` 產出 init.mp4 + .m4s 分段
+- `-force_key_frames expr:gte(t,n_forced*N)` 強制精確的 keyframe 間距，確保分段時長與 playlist 一致
+- 所有分段來自同一個 FFmpeg 進程（不使用按需生成），確保 init segment 與分段格式完全相容
+- playlist 使用 `#EXT-X-VERSION:7` + `#EXT-X-MAP:URI="init.mp4"`
 
 **成功標準：**
 - [ ] 順序播放時分段切換無可感知的破音或中斷

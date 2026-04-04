@@ -14,9 +14,9 @@ import (
 
 // StreamHandler 處理串流相關的 HTTP 請求
 type StreamHandler struct {
-	cfg     config.Config
-	loader  *media.Loader
-	pregen  *composer.PregenManager
+	cfg    config.Config
+	loader *media.Loader
+	pregen *composer.PregenManager
 }
 
 // NewStreamHandler 建立新的串流 handler
@@ -40,6 +40,7 @@ func SetupRouter(h *StreamHandler, uh *UploadHandler, sh *SampleHandler) http.Ha
 	r.Get("/compositions", uh.ListCompositions)
 	r.Post("/sample", sh.GenerateSample)
 	r.Get("/stream/{id}/index.m3u8", h.PlaylistHandler)
+	r.Get("/stream/{id}/init.mp4", h.InitHandler)
 	r.Get("/stream/{id}/{segment}", h.SegmentHandler)
 
 	// 靜態檔案（前端）
@@ -68,6 +69,8 @@ func (h *StreamHandler) PlaylistHandler(w http.ResponseWriter, r *http.Request) 
 	// 背景啟動預生成
 	h.pregen.StartPregen(comp, duration)
 
+	// 立即回傳手動計算的 playlist（顯示完整時長，不等 FFmpeg）
+	// 分段由預生成在背景產生，因為 -force_key_frames 確保切割點精確匹配
 	playlist := composer.GeneratePlaylist(duration, h.cfg.SegmentDuration)
 
 	w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
@@ -75,18 +78,48 @@ func (h *StreamHandler) PlaylistHandler(w http.ResponseWriter, r *http.Request) 
 	w.Write([]byte(playlist))
 }
 
-// SegmentHandler 處理 HLS 分段請求
+// InitHandler 處理 init.mp4 請��
+func (h *StreamHandler) InitHandler(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	comp, err := h.loader.Load(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	// 確保預生成已啟動
+	duration, err := composer.ProbeDuration(comp.Audio.Path)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("無法讀取音檔資訊：%v", err))
+		return
+	}
+	h.pregen.StartPregen(comp, duration)
+
+	// 等待 init.mp4 就緒
+	if err := h.pregen.WaitForInit(id, 30); err != nil {
+		writeError(w, http.StatusServiceUnavailable, fmt.Sprintf("init segment 尚未就緒：%v", err))
+		return
+	}
+
+	initPath := h.pregen.GetInitPath(id)
+	w.Header().Set("Content-Type", "video/mp4")
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	http.ServeFile(w, r, initPath)
+}
+
+// SegmentHandler 處理 HLS fMP4 分段請求
 func (h *StreamHandler) SegmentHandler(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	segment := chi.URLParam(r, "segment")
 
-	if !strings.HasPrefix(segment, "seg_") || !strings.HasSuffix(segment, ".ts") {
+	if !strings.HasPrefix(segment, "seg_") || !strings.HasSuffix(segment, ".m4s") {
 		writeError(w, http.StatusBadRequest, "無效的分段名稱")
 		return
 	}
 
 	numStr := strings.TrimPrefix(segment, "seg_")
-	numStr = strings.TrimSuffix(numStr, ".ts")
+	numStr = strings.TrimSuffix(numStr, ".m4s")
 	segIndex, err := strconv.Atoi(numStr)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "無效的分段編號")
@@ -107,28 +140,18 @@ func (h *StreamHandler) SegmentHandler(w http.ResponseWriter, r *http.Request) {
 
 	totalSegments := composer.SegmentCount(duration, h.cfg.SegmentDuration)
 	if segIndex < 0 || segIndex >= totalSegments {
-		writeError(w, http.StatusNotFound, fmt.Sprintf("分段 %d 不存在（共 %d 個分段）", segIndex, totalSegments))
+		writeError(w, http.StatusNotFound, fmt.Sprintf("分段 %d 不存在��共 %d 個分段）", segIndex, totalSegments))
 		return
 	}
 
-	// 優先使用預生成的分段
-	if h.pregen.IsSegmentReady(id, segIndex) {
-		segPath := h.pregen.GetSegmentPath(id, segIndex)
-		w.Header().Set("Content-Type", "video/mp2t")
-		w.Header().Set("Cache-Control", "public, max-age=3600")
-		http.ServeFile(w, r, segPath)
+	// 等待預生成產出該分段（順序播放時幾乎不用等，跳轉時最多等一個分段的合成時間）
+	if err := h.pregen.WaitForSegment(id, segIndex, 30); err != nil {
+		writeError(w, http.StatusServiceUnavailable, fmt.Sprintf("分段 %d 尚未就緒：%v", segIndex, err))
 		return
 	}
 
-	// Fallback：按需生成
 	segPath := h.pregen.GetSegmentPath(id, segIndex)
-	err = composer.GenerateSegment(comp, segPath, segIndex, h.cfg.SegmentDuration, h.cfg.OutputWidth, h.cfg.OutputHeight)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("合成分段失敗：%v", err))
-		return
-	}
-
-	w.Header().Set("Content-Type", "video/mp2t")
+	w.Header().Set("Content-Type", "video/mp4")
 	w.Header().Set("Cache-Control", "public, max-age=3600")
 	http.ServeFile(w, r, segPath)
 }

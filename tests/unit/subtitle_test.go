@@ -32,7 +32,7 @@ func TestBuildSegmentArgs_WithSubtitle(t *testing.T) {
 		Subtitle:   &media.Subtitle{Path: "/media/test/subtitle.srt", Format: "srt"},
 	}
 
-	args := composer.BuildSegmentArgs(comp, "/tmp/out/seg_000.ts", 0, 6, 1280, 720)
+	args := composer.BuildSegmentArgs(comp, "/tmp/out/seg_000.m4s", 0, 6, 1280, 720)
 	argsStr := strings.Join(args, " ")
 
 	if !strings.Contains(argsStr, "subtitles=/media/test/subtitle.srt") {
