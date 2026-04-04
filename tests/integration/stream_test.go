@@ -117,7 +117,7 @@ func TestPlaylistHandler_ReturnsValidM3U8(t *testing.T) {
 	h := handler.NewStreamHandler(cfg, composer.NewCacheManager(cfg.TmpDir, 10*time.Minute, 0))
 	uh := handler.NewUploadHandler(cfg)
 	sh := handler.NewSampleHandler(cfg)
-	router := handler.SetupRouter(h, uh, sh)
+	router := handler.SetupRouter(h, uh, sh, cfg)
 
 	req := httptest.NewRequest("GET", "/stream/test-sermon/index.m3u8", nil)
 	w := httptest.NewRecorder()
@@ -150,7 +150,7 @@ func TestSegmentHandler_ReturnsValidM4S(t *testing.T) {
 	h := handler.NewStreamHandler(cfg, composer.NewCacheManager(cfg.TmpDir, 10*time.Minute, 0))
 	uh := handler.NewUploadHandler(cfg)
 	sh := handler.NewSampleHandler(cfg)
-	router := handler.SetupRouter(h, uh, sh)
+	router := handler.SetupRouter(h, uh, sh, cfg)
 
 	// 先請求 playlist 觸發預生成
 	req := httptest.NewRequest("GET", "/stream/test-sermon/index.m3u8", nil)

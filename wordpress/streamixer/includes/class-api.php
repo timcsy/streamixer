@@ -72,11 +72,17 @@ class Streamixer_API {
 
 		$body .= "--{$boundary}--\r\n";
 
+		$headers = array(
+			'Content-Type' => 'multipart/form-data; boundary=' . $boundary,
+		);
+		$api_key = get_option( 'streamixer_api_key', '' );
+		if ( ! empty( $api_key ) ) {
+			$headers['X-API-Key'] = $api_key;
+		}
+
 		$response = wp_remote_post( $url, array(
 			'timeout' => 120,
-			'headers' => array(
-				'Content-Type' => 'multipart/form-data; boundary=' . $boundary,
-			),
+			'headers' => $headers,
 			'body'    => $body,
 		) );
 

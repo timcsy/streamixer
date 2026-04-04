@@ -27,6 +27,12 @@ class Streamixer_Settings {
 			'default'           => '',
 		) );
 
+		register_setting( 'streamixer_options', 'streamixer_api_key', array(
+			'type'              => 'string',
+			'sanitize_callback' => 'sanitize_text_field',
+			'default'           => '',
+		) );
+
 		register_setting( 'streamixer_options', 'streamixer_default_background', array(
 			'type'              => 'integer',
 			'sanitize_callback' => 'absint',
@@ -52,6 +58,14 @@ class Streamixer_Settings {
 			'streamixer_public_url',
 			'前端播放 URL',
 			array( __CLASS__, 'render_public_url_field' ),
+			'streamixer-settings',
+			'streamixer_main'
+		);
+
+		add_settings_field(
+			'streamixer_api_key',
+			'API Key',
+			array( __CLASS__, 'render_api_key_field' ),
 			'streamixer-settings',
 			'streamixer_main'
 		);
@@ -85,6 +99,17 @@ class Streamixer_Settings {
 		       placeholder="http://localhost:8081">
 		<p class="description">瀏覽器端存取 Streamixer 的 URL。若留空則使用服務 URL。<br>
 		Docker 環境中，服務 URL 通常是容器內部名稱（如 <code>http://streamixer:8080</code>），而前端播放 URL 是外部可存取的位址（如 <code>http://localhost:8081</code>）。</p>
+		<?php
+	}
+
+	public static function render_api_key_field() {
+		$value = get_option( 'streamixer_api_key', '' );
+		?>
+		<input type="text" name="streamixer_api_key"
+		       value="<?php echo esc_attr( $value ); ?>"
+		       class="regular-text"
+		       placeholder="留空表示不需要認證">
+		<p class="description">Streamixer 服務的 API Key。需與服務端的 <code>API_KEY</code> 環境變數一致。</p>
 		<?php
 	}
 

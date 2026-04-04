@@ -18,6 +18,8 @@ type Config struct {
 	CacheTTL            time.Duration // 快取過期時間
 	CacheMaxSize        int64         // 快取容量上限（bytes，0 = tmpfs 的 80%）
 	CacheSweepInterval  time.Duration // 清掃頻率
+	APIKey              string        // Upload API 認證金鑰（空字串 = 不認證）
+	CORSOrigins         string        // CORS 允許來源（逗號分隔，* = 全部）
 }
 
 // Load 從環境變數載入設定，使用合理預設值
@@ -33,6 +35,8 @@ func Load() Config {
 		CacheTTL:            getDuration("CACHE_TTL", 30*time.Minute),
 		CacheMaxSize:        getInt64("CACHE_MAX_SIZE", 0),
 		CacheSweepInterval:  getDuration("CACHE_SWEEP_INTERVAL", 5*time.Minute),
+		APIKey:              getEnv("API_KEY", ""),
+		CORSOrigins:         getEnv("CORS_ORIGINS", "*"),
 	}
 }
 

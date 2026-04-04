@@ -35,28 +35,53 @@ func NewStreamHandler(cfg config.Config, cache *composer.CacheManager) *StreamHa
 	}
 }
 
-// CORS middleware
-func corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Range")
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+// corsMiddleware 設定 CORS 允許來源
+func corsMiddleware(origins string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", origins)
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Range, X-API-Key")
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// apiKeyMiddleware 驗證 API Key（僅保護寫入端點）
+func apiKeyMiddleware(apiKey string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if apiKey != "" {
+				key := r.Header.Get("X-API-Key")
+				if key == "" {
+					key = r.URL.Query().Get("api_key")
+				}
+				if key != apiKey {
+					writeError(w, http.StatusUnauthorized, "無效的 API Key")
+					return
+				}
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 // SetupRouter 建立包含所有路由的 chi router
-func SetupRouter(h *StreamHandler, uh *UploadHandler, sh *SampleHandler) http.Handler {
+func SetupRouter(h *StreamHandler, uh *UploadHandler, sh *SampleHandler, cfg config.Config) http.Handler {
 	r := chi.NewRouter()
-	r.Use(corsMiddleware)
+	r.Use(corsMiddleware(cfg.CORSOrigins))
 	r.Get("/health", HealthHandler)
-	r.Post("/upload/{id}", uh.Upload)
+
+	// 寫入端點需要 API Key
+	authMw := apiKeyMiddleware(cfg.APIKey)
+	r.With(authMw).Post("/upload/{id}", uh.Upload)
+	r.With(authMw).Post("/sample", sh.GenerateSample)
+
 	r.Get("/compositions", uh.ListCompositions)
-	r.Post("/sample", sh.GenerateSample)
 	r.Get("/stream/{id}/index.m3u8", h.PlaylistHandler)
 	r.Get("/stream/{id}/init.mp4", h.InitHandler)
 	r.Get("/stream/{id}/{segment}", h.SegmentHandler)

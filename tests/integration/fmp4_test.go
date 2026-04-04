@@ -124,7 +124,7 @@ func TestFmp4_PlaylistContainsExtXMap(t *testing.T) {
 	h := handler.NewStreamHandler(cfg, composer.NewCacheManager(cfg.TmpDir, 10*time.Minute, 0))
 	uh := handler.NewUploadHandler(cfg)
 	sh := handler.NewSampleHandler(cfg)
-	router := handler.SetupRouter(h, uh, sh)
+	router := handler.SetupRouter(h, uh, sh, cfg)
 
 	req := httptest.NewRequest("GET", "/stream/fmp4-test/index.m3u8", nil)
 	w := httptest.NewRecorder()
@@ -164,7 +164,7 @@ func TestFmp4_InitEndpoint(t *testing.T) {
 	h := handler.NewStreamHandler(cfg, composer.NewCacheManager(cfg.TmpDir, 10*time.Minute, 0))
 	uh := handler.NewUploadHandler(cfg)
 	sh := handler.NewSampleHandler(cfg)
-	router := handler.SetupRouter(h, uh, sh)
+	router := handler.SetupRouter(h, uh, sh, cfg)
 
 	// 先請求 playlist 觸發預生成
 	req := httptest.NewRequest("GET", "/stream/fmp4-test/index.m3u8", nil)
@@ -205,7 +205,7 @@ func TestFmp4_SegmentContentType(t *testing.T) {
 	h := handler.NewStreamHandler(cfg, composer.NewCacheManager(cfg.TmpDir, 10*time.Minute, 0))
 	uh := handler.NewUploadHandler(cfg)
 	sh := handler.NewSampleHandler(cfg)
-	router := handler.SetupRouter(h, uh, sh)
+	router := handler.SetupRouter(h, uh, sh, cfg)
 
 	// 先請求 playlist 觸發預生成
 	req := httptest.NewRequest("GET", "/stream/fmp4-test/index.m3u8", nil)

@@ -25,7 +25,7 @@ func main() {
 	streamH := handler.NewStreamHandler(cfg, cache)
 	uploadH := handler.NewUploadHandler(cfg)
 	sampleH := handler.NewSampleHandler(cfg)
-	router := handler.SetupRouter(streamH, uploadH, sampleH)
+	router := handler.SetupRouter(streamH, uploadH, sampleH, cfg)
 
 	log.Printf("Streamixer 啟動中，port %s，素材目錄 %s", cfg.Port, cfg.MediaDir)
 	log.Printf("快取設定：TTL %v，容量上限 %d bytes，清掃頻率 %v", cfg.CacheTTL, cfg.CacheMaxSize, cfg.CacheSweepInterval)
