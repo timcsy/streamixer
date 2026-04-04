@@ -2,9 +2,9 @@ services:
   streamixer:
     build: .
     ports:
-      - "8080:8080"
+      - "8081:8080"
     volumes:
-      - ./media:/media:ro
+      - streamixer-media:/media
     tmpfs:
       - /dev/shm/streamixer:size=512M
     environment:
@@ -14,3 +14,6 @@ services:
       - CACHE_TTL=30m
       - CACHE_SWEEP_INTERVAL=5m
     restart: unless-stopped
+
+volumes:
+  streamixer-media:

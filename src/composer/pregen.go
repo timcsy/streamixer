@@ -82,9 +82,18 @@ func (m *PregenManager) StartPregen(comp *media.MediaComposition, duration float
 
 		m.mu.Lock()
 		if existing, ok := m.tasks[comp.ID]; ok {
-			if existing.Status == PregenCompleted || existing.Status == PregenRunning {
+			if existing.Status == PregenRunning {
 				m.mu.Unlock()
 				return nil, nil
+			}
+			// 如果標記完成但分段已被清掃，需要重新預生成
+			if existing.Status == PregenCompleted {
+				initPath := filepath.Join(outDir, "init.mp4")
+				if _, err := os.Stat(initPath); err == nil {
+					m.mu.Unlock()
+					return nil, nil
+				}
+				// 分段已被清掃，重新預生成
 			}
 		}
 		m.tasks[comp.ID] = task

@@ -35,6 +35,24 @@ Streamixer_Shortcode::init();
 // 前端 assets
 Streamixer_Frontend::init();
 
+// 允許上傳字幕檔案格式
+add_filter( 'upload_mimes', function( $mimes ) {
+	$mimes['srt'] = 'text/plain';
+	$mimes['vtt'] = 'text/vtt';
+	return $mimes;
+} );
+
+// 繞過 WordPress 的 filetype 驗證（srt/vtt 不在 WordPress 內建白名單中）
+add_filter( 'wp_check_filetype_and_ext', function( $data, $file, $filename, $mimes ) {
+	$ext = pathinfo( $filename, PATHINFO_EXTENSION );
+	if ( in_array( strtolower( $ext ), array( 'srt', 'vtt' ), true ) ) {
+		$data['ext']  = $ext;
+		$data['type'] = ( 'vtt' === $ext ) ? 'text/vtt' : 'text/plain';
+		$data['proper_filename'] = $filename;
+	}
+	return $data;
+}, 10, 4 );
+
 // Gutenberg Block（純 JS，不需 build）
 add_action( 'init', 'streamixer_register_block' );
 function streamixer_register_block() {
