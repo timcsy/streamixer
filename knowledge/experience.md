@@ -57,3 +57,11 @@
 - **解決方式**：在 HTML 的 `data-*` 屬性中使用 `esc_attr()` 取代 `esc_url()`，避免二次編碼。
 - **教訓**：WordPress 中含有 percent-encoded 字元的 URL，在 HTML 屬性中 MUST 使用 `esc_attr()` 而非 `esc_url()`。`esc_url()` 會重新編碼 `%` 字元，破壞已編碼的 URL。
 - **來源**：階段 4 WordPress 外掛中中文素材 slug 的播放 URL 錯誤
+
+### WordPress post_name 已是 URL 編碼，不需再 encode
+
+- **理論說**：組合 URL 時應該用 `rawurlencode()` 或 `urlencode()` 編碼路徑段，確保特殊字元被正確處理。
+- **實際發生**：WordPress 的 `post_name`（slug）在資料庫中已經是 URL 編碼形式（中文字 → `%e6%b8%ac%e8%a9%a6`）。再用 `rawurlencode()` 會把 `%` 編碼成 `%25`，產生 `%25e6%25b8%25ac` 的雙重編碼 URL。同樣的錯誤在串流 URL 和下載 URL 中各出現一次。
+- **解決方式**：直接拼接 `post_name` 到 URL 中，不再 encode。
+- **教訓**：WordPress 的 `post_name` MUST 直接用於 URL 拼接，不需要 `rawurlencode()` 或 `urlencode()`。在使用任何 encode 函式前，先確認資料來源是否已經是編碼後的形式。
+- **來源**：階段 7 下載功能的 404 錯誤（同一問題第二次出現）

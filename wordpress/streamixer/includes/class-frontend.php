@@ -89,9 +89,9 @@ class Streamixer_Frontend {
 			<div class="streamixer-error" style="display:none;">
 				無法載入串流，請稍後再試。
 			</div>
-			<div class="streamixer-player-toolbar">
-				<a href="<?php echo esc_attr( $download_url ); ?>" class="streamixer-download-btn" download>⬇ 下載影片</a>
-			</div>
+		</div>
+		<div class="streamixer-player-toolbar">
+			<a href="<?php echo esc_attr( $download_url ); ?>" class="streamixer-download-btn" download>⬇ 下載影片</a>
 		</div>
 		<?php
 		return ob_get_clean();
