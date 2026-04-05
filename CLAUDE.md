@@ -9,6 +9,8 @@ Auto-generated from all feature plans. Last updated: 2026-04-05
 - Go 1.25（既有） + 無新增外部相依（使用標準函式庫 sync、time、os） (004-smart-cache-management)
 - PHP 8.0+、JavaScript（React/JSX for Gutenberg Block） + WordPress 6.0+、hls.js（CDN）、@wordpress/scripts（Block 建置工具） (005-wordpress-plugin)
 - WordPress 資料庫（post meta）+ WordPress 媒體庫（檔案） (005-wordpress-plugin)
+- Go 1.25（既有）+ PHP 8.0+（既有 WordPress 外掛） + 無新增（使用標準函式庫 io、os） (006-video-download)
+- mpfs（既有，讀取預生成的分段） (006-video-download)
 
 - Go 1.22+ + FFmpeg 6.x（子程序）、go-chi/chi v5（HTTP 路由） (001-hls-stream-synthesis)
 
@@ -29,9 +31,9 @@ tests/
 Go 1.22+: Follow standard conventions
 
 ## Recent Changes
+- 006-video-download: Added Go 1.25（既有）+ PHP 8.0+（既有 WordPress 外掛） + 無新增（使用標準函式庫 io、os）
 - 005-wordpress-plugin: Added PHP 8.0+、JavaScript（React/JSX for Gutenberg Block） + WordPress 6.0+、hls.js（CDN）、@wordpress/scripts（Block 建置工具）
 - 004-smart-cache-management: Added Go 1.25（既有） + 無新增外部相依（使用標準函式庫 sync、time、os）
-- 003-fmp4-segment-format: Added Go 1.25（既有） + FFmpeg 6.x+（既有，需 `-hls_segment_type fmp4` 支援，FFmpeg 3.3+ 可用）
 
 
 <!-- MANUAL ADDITIONS START -->

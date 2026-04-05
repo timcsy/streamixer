@@ -123,6 +123,11 @@ class Streamixer_API {
 	/**
 	 * 取得素材的 HLS 串流 URL
 	 */
+	public static function get_download_url( $post_id ) {
+		$composition_id = self::get_composition_id( $post_id );
+		return self::get_public_url() . '/download/' . rawurlencode( $composition_id );
+	}
+
 	public static function get_stream_url( $post_id ) {
 		$composition_id = self::get_composition_id( $post_id );
 		return self::get_public_url() . '/stream/' . rawurlencode( $composition_id ) . '/index.m3u8';

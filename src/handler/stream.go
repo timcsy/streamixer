@@ -86,6 +86,10 @@ func SetupRouter(h *StreamHandler, uh *UploadHandler, sh *SampleHandler, cfg con
 	r.Get("/stream/{id}/init.mp4", h.InitHandler)
 	r.Get("/stream/{id}/{segment}", h.SegmentHandler)
 
+	// 下載端點
+	dh := NewDownloadHandler(cfg, h.pregen)
+	r.Get("/download/{id}", dh.Download)
+
 	// 靜態檔案（前端）
 	staticDir := http.Dir("static")
 	r.Get("/*", http.FileServer(staticDir).ServeHTTP)

@@ -185,6 +185,12 @@ class Streamixer_CPT {
 		</div>
 		<?php endif; ?>
 
+		<?php if ( 'synced' === $sync_status ) : ?>
+		<div style="margin-top: 10px;">
+			<a href="<?php echo esc_attr( Streamixer_API::get_download_url( $post->ID ) ); ?>" class="button" target="_blank">⬇ 匯出影片（MP4）</a>
+		</div>
+		<?php endif; ?>
+
 		<script>
 		jQuery(document).ready(function($) {
 			function setupMediaButton(buttonId, clearId, inputId, previewId, type) {

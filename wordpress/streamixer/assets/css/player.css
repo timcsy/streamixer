@@ -34,6 +34,29 @@
   font-size: 0.9em;
 }
 
+.streamixer-player-toolbar {
+  padding: 8px 12px;
+  background: #111;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.streamixer-download-btn {
+  display: inline-block;
+  padding: 6px 14px;
+  background: #3b82f6;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 4px;
+  font-size: 0.85em;
+  transition: background 0.2s;
+}
+
+.streamixer-download-btn:hover {
+  background: #2563eb;
+  color: #fff;
+}
+
 /* 列表頁 */
 .streamixer-archive {
   max-width: 960px;

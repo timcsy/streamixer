@@ -212,6 +212,42 @@ function streamixer_media_button_modal() {
 	<?php
 }
 
+// 批次操作：匯出影片
+add_filter( 'bulk_actions-edit-streamixer', function( $actions ) {
+	$actions['streamixer_export'] = '匯出影片（MP4）';
+	return $actions;
+} );
+
+add_filter( 'handle_bulk_actions-edit-streamixer', function( $redirect_to, $action, $post_ids ) {
+	if ( 'streamixer_export' !== $action ) {
+		return $redirect_to;
+	}
+	$urls = array();
+	foreach ( $post_ids as $post_id ) {
+		$sync_status = get_post_meta( $post_id, '_streamixer_sync_status', true );
+		if ( 'synced' === $sync_status ) {
+			$urls[] = Streamixer_API::get_download_url( $post_id );
+		}
+	}
+	$redirect_to = add_query_arg( 'streamixer_export_urls', urlencode( implode( ',', $urls ) ), $redirect_to );
+	$redirect_to = add_query_arg( 'streamixer_exported', count( $urls ), $redirect_to );
+	return $redirect_to;
+}, 10, 3 );
+
+add_action( 'admin_notices', function() {
+	if ( ! isset( $_GET['streamixer_exported'] ) ) {
+		return;
+	}
+	$count = intval( $_GET['streamixer_exported'] );
+	$urls  = isset( $_GET['streamixer_export_urls'] ) ? urldecode( $_GET['streamixer_export_urls'] ) : '';
+	if ( $count > 0 && $urls ) {
+		echo '<div class="notice notice-success"><p>正在匯出 ' . $count . ' 個影片...</p></div>';
+		echo '<script>(function(){ var urls = "' . esc_js( $urls ) . '".split(","); urls.forEach(function(url, i){ setTimeout(function(){ window.open(url, "_blank"); }, i * 1000); }); })();</script>';
+	} elseif ( $count === 0 ) {
+		echo '<div class="notice notice-warning"><p>選取的素材中沒有已同步的項目。</p></div>';
+	}
+} );
+
 // 啟用/停用 hook
 register_activation_hook( __FILE__, function() {
 	Streamixer_CPT::register();

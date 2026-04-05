@@ -61,6 +61,7 @@ http://localhost:8080/stream/my-sermon/index.m3u8
 | GET | `/stream/{id}/index.m3u8` | HLS playlist |
 | GET | `/stream/{id}/init.mp4` | fMP4 init segment |
 | GET | `/stream/{id}/seg_{n}.m4s` | fMP4 media segment |
+| GET | `/download/{id}` | 下載合成後的完整 MP4 影片 |
 | GET | `/health` | 健康檢查 |
 
 ### 管理端點（需 API Key）
