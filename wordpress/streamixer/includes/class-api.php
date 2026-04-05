@@ -44,7 +44,7 @@ class Streamixer_API {
 		}
 
 		$composition_id = self::get_composition_id( $post_id );
-		$url            = self::get_service_url() . '/upload/' . urlencode( $composition_id );
+		$url            = self::get_service_url() . '/upload/' . $composition_id;
 
 		// 準備 multipart 上傳
 		$boundary = wp_generate_password( 24, false );
@@ -125,12 +125,12 @@ class Streamixer_API {
 	 */
 	public static function get_download_url( $post_id ) {
 		$composition_id = self::get_composition_id( $post_id );
-		return self::get_public_url() . '/download/' . rawurlencode( $composition_id );
+		return self::get_public_url() . '/download/' . $composition_id;
 	}
 
 	public static function get_stream_url( $post_id ) {
 		$composition_id = self::get_composition_id( $post_id );
-		return self::get_public_url() . '/stream/' . rawurlencode( $composition_id ) . '/index.m3u8';
+		return self::get_public_url() . '/stream/' . $composition_id . '/index.m3u8';
 	}
 
 	/**
