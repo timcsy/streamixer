@@ -97,6 +97,12 @@ class Streamixer_API {
 			update_post_meta( $post_id, '_streamixer_composition_id', $composition_id );
 			update_post_meta( $post_id, '_streamixer_sync_status', 'synced' );
 			update_post_meta( $post_id, '_streamixer_sync_error', '' );
+
+			// 同步成功後清除本地檔案
+			if ( get_option( 'streamixer_auto_cleanup', '1' ) === '1' ) {
+				self::cleanup_local_files( $post_id );
+			}
+
 			return true;
 		}
 
@@ -120,6 +126,52 @@ class Streamixer_API {
 	public static function get_stream_url( $post_id ) {
 		$composition_id = self::get_composition_id( $post_id );
 		return self::get_public_url() . '/stream/' . rawurlencode( $composition_id ) . '/index.m3u8';
+	}
+
+	/**
+	 * 清除本地素材檔案（保留 attachment 記錄）
+	 */
+	public static function cleanup_local_files( $post_id ) {
+		$fields = array( '_streamixer_audio_id', '_streamixer_background_id', '_streamixer_subtitle_id' );
+
+		foreach ( $fields as $field ) {
+			$attachment_id = get_post_meta( $post_id, $field, true );
+			if ( ! $attachment_id ) {
+				continue;
+			}
+
+			// 記錄原始檔名（清除後仍可顯示）
+			$file_path = get_attached_file( $attachment_id );
+			if ( ! $file_path || ! file_exists( $file_path ) ) {
+				continue; // 已經清除過
+			}
+
+			$filename = basename( $file_path );
+			update_post_meta( $post_id, $field . '_filename', $filename );
+
+			// 刪除實際檔案（含縮圖等衍生檔案）
+			$metadata = wp_get_attachment_metadata( $attachment_id );
+			$upload_dir = wp_upload_dir();
+			$base_dir = $upload_dir['basedir'];
+
+			// 刪除原始檔案
+			if ( file_exists( $file_path ) ) {
+				unlink( $file_path );
+			}
+
+			// 刪除縮圖等衍生檔案
+			if ( $metadata && isset( $metadata['sizes'] ) ) {
+				$file_dir = dirname( $file_path );
+				foreach ( $metadata['sizes'] as $size ) {
+					$thumb_path = $file_dir . '/' . $size['file'];
+					if ( file_exists( $thumb_path ) ) {
+						unlink( $thumb_path );
+					}
+				}
+			}
+		}
+
+		update_post_meta( $post_id, '_streamixer_files_cleaned', '1' );
 	}
 
 	/**

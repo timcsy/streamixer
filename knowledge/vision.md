@@ -10,7 +10,7 @@ Streamixer 是一個即時合成串流服務：將分開儲存的音檔、背景
 
 ## 現狀
 
-階段 1 至 4 已全部完成。Go 串流服務使用 fMP4（CMAF）分段格式、背景預生成、LRU+TTL 快取管理。WordPress 外掛提供後台素材管理（CPT + Media Library）、Shortcode 與 Gutenberg Block 嵌入、響應式播放頁面。以 docker-compose 同時運行 Streamixer + WordPress + MySQL。
+階段 1 至 5 已完成並發布 v1.1.0。Go 串流服務使用 fMP4（CMAF）分段格式、背景預生成、LRU+TTL 快取管理、API Key 認證、可設定 CORS。WordPress 外掛提供後台素材管理（CPT + Media Library）、Shortcode 與 Gutenberg Block 嵌入、響應式播放頁面。Streamixer 以 Docker 獨立部署，WordPress 外掛獨立安裝。
 
 ## 架構
 
@@ -146,15 +146,14 @@ Streamixer 是一個即時合成串流服務：將分開儲存的音檔、背景
 
 ### 階段 5：發布準備
 
-- [ ] 完成
+- [x] 完成
 
 交付：將專案整理至可公開發布的狀態，包含文件、CI/CD、安全性強化。
 前置條件：階段 4
 
 **文件**：
 - README.md：專案介紹、快速開始、架構說明、設定參數
-- LICENSE：選擇開源授權條款
-- WordPress 外掛 readme.txt（WordPress 外掛目錄標準格式）
+- LICENSE：MIT 授權
 
 **CI/CD**：
 - GitHub Actions：推送 tag 時自動建置 Docker Image 並發布至 GitHub Container Registry（ghcr.io）
@@ -169,8 +168,28 @@ Streamixer 是一個即時合成串流服務：將分開儲存的音檔、背景
 - 建立 v1.0.0 tag
 
 **成功標準：**
-- [ ] README.md 完整且可指引新使用者從零開始部署
-- [ ] 推送 git tag 後自動產生 Docker Image 至 ghcr.io
-- [ ] WordPress 外掛可從 GitHub Release 下載 zip 安裝
-- [ ] Upload API 需要 API Key 才能存取
-- [ ] CORS 允許來源可透過環境變數設定
+- [x] README.md 完整且可指引新使用者從零開始部署
+- [x] 推送 git tag 後自動產生 Docker Image 至 ghcr.io
+- [x] WordPress 外掛可從 GitHub Release 下載 zip 安裝
+- [x] Upload API 需要 API Key 才能存取
+- [x] CORS 允許來源可透過環境變數設定
+
+### 階段 6：同步後清除 WordPress 端檔案
+
+- [ ] 完成
+
+交付：素材同步至 Streamixer 成功後，自動刪除 WordPress 媒體庫中的原始檔案，避免同一份檔案佔用兩倍儲存空間。
+前置條件：階段 4
+
+**策略**：
+- 同步成功後，刪除 WordPress attachment 的實際檔案（含縮圖等衍生檔案）
+- 保留 WordPress 的 attachment 記錄（post meta），以便在後台顯示檔案名稱和同步狀態
+- 在 meta box 中顯示「檔案已同步至 Streamixer，本地檔案已清除」的提示
+- 若使用者重新上傳新檔案（替換素材），正常走上傳→同步→清除流程
+- 提供設定選項讓使用者可選擇是否啟用自動清除（預設啟用）
+
+**成功標準：**
+- [ ] 同步成功後 WordPress 端不再佔用音檔和圖片的儲存空間
+- [ ] 後台仍可正常顯示素材組合資訊（標題、檔案名稱、同步狀態）
+- [ ] 重新上傳檔案時流程正常（上傳→同步→清除）
+- [ ] 可透過設定頁關閉自動清除功能

@@ -33,6 +33,12 @@ class Streamixer_Settings {
 			'default'           => '',
 		) );
 
+		register_setting( 'streamixer_options', 'streamixer_auto_cleanup', array(
+			'type'              => 'string',
+			'sanitize_callback' => 'sanitize_text_field',
+			'default'           => '1',
+		) );
+
 		register_setting( 'streamixer_options', 'streamixer_default_background', array(
 			'type'              => 'integer',
 			'sanitize_callback' => 'absint',
@@ -66,6 +72,14 @@ class Streamixer_Settings {
 			'streamixer_api_key',
 			'API Key',
 			array( __CLASS__, 'render_api_key_field' ),
+			'streamixer-settings',
+			'streamixer_main'
+		);
+
+		add_settings_field(
+			'streamixer_auto_cleanup',
+			'同步後清除本地檔案',
+			array( __CLASS__, 'render_auto_cleanup_field' ),
 			'streamixer-settings',
 			'streamixer_main'
 		);
@@ -110,6 +124,18 @@ class Streamixer_Settings {
 		       class="regular-text"
 		       placeholder="留空表示不需要認證">
 		<p class="description">Streamixer 服務的 API Key。需與服務端的 <code>API_KEY</code> 環境變數一致。</p>
+		<?php
+	}
+
+	public static function render_auto_cleanup_field() {
+		$value = get_option( 'streamixer_auto_cleanup', '1' );
+		?>
+		<input type="hidden" name="streamixer_auto_cleanup" value="0">
+		<label>
+			<input type="checkbox" name="streamixer_auto_cleanup" value="1" <?php checked( $value, '1' ); ?>>
+			素材同步至 Streamixer 後，自動刪除 WordPress 端的原始檔案以節省儲存空間
+		</label>
+		<p class="description">啟用後，音檔、圖片、字幕在同步成功後會從 WordPress 媒體庫中刪除實際檔案（保留記錄）。</p>
 		<?php
 	}
 

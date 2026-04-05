@@ -116,12 +116,34 @@ class Streamixer_CPT {
 		</div>
 		<?php endif; ?>
 
+		<?php
+		$files_cleaned = get_post_meta( $post->ID, '_streamixer_files_cleaned', true );
+
+		$audio_display = $audio_url ? esc_html( basename( $audio_url ) ) : '未選擇';
+		if ( ! $audio_url && $audio_id ) {
+			$saved_name = get_post_meta( $post->ID, '_streamixer_audio_id_filename', true );
+			$audio_display = $saved_name ? esc_html( $saved_name ) . '（已同步，本地已清除）' : '已同步至 Streamixer';
+		}
+
+		$bg_display = $bg_url ? esc_html( basename( $bg_url ) ) : '未選擇';
+		if ( ! $bg_url && $background_id ) {
+			$saved_name = get_post_meta( $post->ID, '_streamixer_background_id_filename', true );
+			$bg_display = $saved_name ? esc_html( $saved_name ) . '（已同步，本地已清除）' : '已同步至 Streamixer';
+		}
+
+		$sub_display = $sub_url ? esc_html( basename( $sub_url ) ) : '未選擇';
+		if ( ! $sub_url && $subtitle_id ) {
+			$saved_name = get_post_meta( $post->ID, '_streamixer_subtitle_id_filename', true );
+			$sub_display = $saved_name ? esc_html( $saved_name ) . '（已同步，本地已清除）' : '已同步至 Streamixer';
+		}
+		?>
+
 		<div class="streamixer-field">
 			<label>音檔（MP3 / WAV）*</label>
 			<input type="hidden" name="streamixer_audio_id" id="streamixer_audio_id" value="<?php echo esc_attr( $audio_id ); ?>">
 			<button type="button" class="button" id="streamixer_audio_btn">選擇音檔</button>
 			<button type="button" class="button" id="streamixer_audio_clear">清除</button>
-			<div class="streamixer-preview" id="streamixer_audio_preview"><?php echo $audio_url ? esc_html( basename( $audio_url ) ) : '未選擇'; ?></div>
+			<div class="streamixer-preview" id="streamixer_audio_preview"><?php echo $audio_display; ?></div>
 		</div>
 
 		<div class="streamixer-field">
@@ -129,7 +151,7 @@ class Streamixer_CPT {
 			<input type="hidden" name="streamixer_background_id" id="streamixer_background_id" value="<?php echo esc_attr( $background_id ); ?>">
 			<button type="button" class="button" id="streamixer_background_btn">選擇圖片</button>
 			<button type="button" class="button" id="streamixer_background_clear">清除</button>
-			<div class="streamixer-preview" id="streamixer_background_preview"><?php echo $bg_url ? esc_html( basename( $bg_url ) ) : '未選擇'; ?></div>
+			<div class="streamixer-preview" id="streamixer_background_preview"><?php echo $bg_display; ?></div>
 		</div>
 
 		<div class="streamixer-field">
@@ -137,7 +159,7 @@ class Streamixer_CPT {
 			<input type="hidden" name="streamixer_subtitle_id" id="streamixer_subtitle_id" value="<?php echo esc_attr( $subtitle_id ); ?>">
 			<button type="button" class="button" id="streamixer_subtitle_btn">選擇字幕</button>
 			<button type="button" class="button" id="streamixer_subtitle_clear">清除</button>
-			<div class="streamixer-preview" id="streamixer_subtitle_preview"><?php echo $sub_url ? esc_html( basename( $sub_url ) ) : '未選擇'; ?></div>
+			<div class="streamixer-preview" id="streamixer_subtitle_preview"><?php echo $sub_display; ?></div>
 		</div>
 
 		<?php if ( $sync_status ) : ?>
@@ -145,7 +167,12 @@ class Streamixer_CPT {
 			<?php
 			switch ( $sync_status ) {
 				case 'synced':
-					echo '✓ 已同步至 Streamixer';
+					$files_cleaned = get_post_meta( $post->ID, '_streamixer_files_cleaned', true );
+					if ( $files_cleaned ) {
+						echo '✓ 已同步至 Streamixer（本地檔案已清除，節省儲存空間）';
+					} else {
+						echo '✓ 已同步至 Streamixer';
+					}
 					break;
 				case 'pending':
 					echo '⏳ 等待同步...';
