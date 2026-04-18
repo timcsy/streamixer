@@ -57,7 +57,7 @@
   }
 
   function initDownloadButton(toolbar) {
-    var btn = toolbar.querySelector('.streamixer-download-btn');
+    var btn = toolbar.querySelector('button.streamixer-download-btn');
     var progress = toolbar.querySelector('.streamixer-download-progress');
     var bar = toolbar.querySelector('.streamixer-download-progress-bar span');
     var text = toolbar.querySelector('.streamixer-download-progress-text');

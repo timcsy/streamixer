@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Streamixer
  * Description: 將音檔、背景圖片與字幕即時合成為 HLS 影片串流。管理素材組合並在前台播放。
- * Version: 1.5.0
+ * Version: 1.6.0
  * Author: Streamixer
  * Text Domain: streamixer
  * Requires at least: 6.0
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'STREAMIXER_VERSION', '1.5.0' );
+define( 'STREAMIXER_VERSION', '1.6.0' );
 define( 'STREAMIXER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'STREAMIXER_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -35,19 +35,25 @@ Streamixer_Shortcode::init();
 // 前端 assets
 Streamixer_Frontend::init();
 
-// 允許上傳字幕檔案格式
+// 允許上傳字幕與逐字稿檔案格式
 add_filter( 'upload_mimes', function( $mimes ) {
 	$mimes['srt'] = 'text/plain';
 	$mimes['vtt'] = 'text/vtt';
+	$mimes['md']  = 'text/markdown';
 	return $mimes;
 } );
 
-// 繞過 WordPress 的 filetype 驗證（srt/vtt 不在 WordPress 內建白名單中）
+// 繞過 WordPress 的 filetype 驗證（srt/vtt/md 不在 WordPress 內建白名單中）
 add_filter( 'wp_check_filetype_and_ext', function( $data, $file, $filename, $mimes ) {
-	$ext = pathinfo( $filename, PATHINFO_EXTENSION );
-	if ( in_array( strtolower( $ext ), array( 'srt', 'vtt' ), true ) ) {
+	$ext = strtolower( pathinfo( $filename, PATHINFO_EXTENSION ) );
+	$types = array(
+		'srt' => 'text/plain',
+		'vtt' => 'text/vtt',
+		'md'  => 'text/markdown',
+	);
+	if ( isset( $types[ $ext ] ) ) {
 		$data['ext']  = $ext;
-		$data['type'] = ( 'vtt' === $ext ) ? 'text/vtt' : 'text/plain';
+		$data['type'] = $types[ $ext ];
 		$data['proper_filename'] = $filename;
 	}
 	return $data;
@@ -151,11 +157,11 @@ function streamixer_media_button_modal() {
 				<input type="text" id="streamixer-search" placeholder="搜尋素材..." style="width:100%; padding:8px 12px; border:1px solid #ccc; border-radius:4px; margin-bottom:12px; box-sizing:border-box;">
 				<div id="streamixer-list" style="border:1px solid #eee; border-radius:4px; max-height:40vh; overflow-y:auto;">
 					<?php foreach ( $compositions as $comp ) : ?>
-						<div class="streamixer-modal-item" data-slug="<?php echo esc_attr( $comp->post_name ); ?>" data-title="<?php echo esc_attr( $comp->post_title ); ?>"
+						<div class="streamixer-modal-item" data-slug="<?php echo esc_attr( $comp->ID ); ?>" data-title="<?php echo esc_attr( $comp->post_title ); ?>"
 						     style="padding:10px 14px; cursor:pointer; border-bottom:1px solid #f0f0f0; transition:background 0.15s;"
 						     onmouseover="this.style.background='#f0f6fc'" onmouseout="this.style.background='transparent'">
 							<div style="font-weight:500;"><?php echo esc_html( $comp->post_title ); ?></div>
-							<div style="font-size:12px; color:#999; margin-top:2px;"><?php echo get_the_date( 'Y-m-d', $comp ); ?> · <code style="font-size:11px;">[streamixer id="<?php echo esc_attr( $comp->post_name ); ?>"]</code></div>
+							<div style="font-size:12px; color:#999; margin-top:2px;"><?php echo get_the_date( 'Y-m-d', $comp ); ?> · <code style="font-size:11px;">[streamixer id="<?php echo esc_attr( $comp->ID ); ?>"]</code></div>
 						</div>
 					<?php endforeach; ?>
 				</div>
@@ -220,25 +226,53 @@ function streamixer_media_button_modal() {
 	<?php
 }
 
-// 批次操作：匯出影片
+// 批次操作：匯出影片、音檔、逐字稿
 add_filter( 'bulk_actions-edit-streamixer', function( $actions ) {
-	$actions['streamixer_export'] = '匯出影片（MP4）';
+	$actions['streamixer_export']            = '匯出影片（MP4）';
+	$actions['streamixer_export_audio']      = '匯出音檔';
+	$actions['streamixer_export_transcript'] = '匯出逐字稿';
 	return $actions;
 } );
 
 add_filter( 'handle_bulk_actions-edit-streamixer', function( $redirect_to, $action, $post_ids ) {
-	if ( 'streamixer_export' !== $action ) {
+	$export_map = array(
+		'streamixer_export'            => array( 'type' => 'video',      'label' => '影片' ),
+		'streamixer_export_audio'      => array( 'type' => 'audio',      'label' => '音檔' ),
+		'streamixer_export_transcript' => array( 'type' => 'transcript', 'label' => '逐字稿' ),
+	);
+	if ( ! isset( $export_map[ $action ] ) ) {
 		return $redirect_to;
 	}
-	$urls = array();
+	$type    = $export_map[ $action ]['type'];
+	$label   = $export_map[ $action ]['label'];
+	$urls    = array();
+	$skipped = 0;
 	foreach ( $post_ids as $post_id ) {
 		$sync_status = get_post_meta( $post_id, '_streamixer_sync_status', true );
-		if ( 'synced' === $sync_status ) {
-			$urls[] = Streamixer_API::get_download_url( $post_id );
+		if ( 'synced' !== $sync_status ) {
+			$skipped++;
+			continue;
+		}
+		switch ( $type ) {
+			case 'video':
+				$urls[] = Streamixer_API::get_download_url( $post_id );
+				break;
+			case 'audio':
+				$urls[] = Streamixer_API::get_audio_url( $post_id );
+				break;
+			case 'transcript':
+				if ( Streamixer_API::has_transcript( $post_id ) ) {
+					$urls[] = Streamixer_API::get_transcript_url( $post_id );
+				} else {
+					$skipped++;
+				}
+				break;
 		}
 	}
 	$redirect_to = add_query_arg( 'streamixer_export_urls', urlencode( implode( ',', $urls ) ), $redirect_to );
 	$redirect_to = add_query_arg( 'streamixer_exported', count( $urls ), $redirect_to );
+	$redirect_to = add_query_arg( 'streamixer_export_skipped', $skipped, $redirect_to );
+	$redirect_to = add_query_arg( 'streamixer_export_label', urlencode( $label ), $redirect_to );
 	return $redirect_to;
 }, 10, 3 );
 
@@ -246,13 +280,23 @@ add_action( 'admin_notices', function() {
 	if ( ! isset( $_GET['streamixer_exported'] ) ) {
 		return;
 	}
-	$count = intval( $_GET['streamixer_exported'] );
-	$urls  = isset( $_GET['streamixer_export_urls'] ) ? urldecode( $_GET['streamixer_export_urls'] ) : '';
+	$count   = intval( $_GET['streamixer_exported'] );
+	$skipped = isset( $_GET['streamixer_export_skipped'] ) ? intval( $_GET['streamixer_export_skipped'] ) : 0;
+	$label   = isset( $_GET['streamixer_export_label'] ) ? urldecode( $_GET['streamixer_export_label'] ) : '檔案';
+	$urls    = isset( $_GET['streamixer_export_urls'] ) ? urldecode( $_GET['streamixer_export_urls'] ) : '';
 	if ( $count > 0 && $urls ) {
-		echo '<div class="notice notice-success"><p>正在匯出 ' . $count . ' 個影片...</p></div>';
+		$msg = '正在匯出 ' . $count . ' 個' . esc_html( $label );
+		if ( $skipped > 0 ) {
+			$msg .= '；已跳過 ' . $skipped . ' 個未同步或無此項目';
+		}
+		echo '<div class="notice notice-success"><p>' . $msg . '...</p></div>';
 		echo '<script>(function(){ var urls = "' . esc_js( $urls ) . '".split(","); urls.forEach(function(url, i){ setTimeout(function(){ window.open(url, "_blank"); }, i * 1000); }); })();</script>';
-	} elseif ( $count === 0 ) {
-		echo '<div class="notice notice-warning"><p>選取的素材中沒有已同步的項目。</p></div>';
+	} else {
+		$msg = '選取的素材中沒有可匯出的' . esc_html( $label );
+		if ( $skipped > 0 ) {
+			$msg .= '（跳過 ' . $skipped . ' 個）';
+		}
+		echo '<div class="notice notice-warning"><p>' . $msg . '。</p></div>';
 	}
 } );
 

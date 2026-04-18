@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -16,6 +17,19 @@ import (
 	"github.com/timcsy/streamixer/src/config"
 	"github.com/timcsy/streamixer/src/media"
 )
+
+// contentDisposition 產生符合 RFC 5987 的 attachment 標頭，保留原檔名（支援非 ASCII）
+func contentDisposition(name string) string {
+	ascii := sanitizeFilename(name)
+	// 非 ASCII 字元以 ? 取代作為 fallback
+	asciiSafe := strings.Map(func(r rune) rune {
+		if r > 127 {
+			return '_'
+		}
+		return r
+	}, ascii)
+	return fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`, asciiSafe, url.PathEscape(name))
+}
 
 // DownloadHandler 處理影片下載請求
 type DownloadHandler struct {
@@ -142,9 +156,8 @@ func (h *DownloadHandler) Download(w http.ResponseWriter, r *http.Request) {
 		totalSize += info.Size()
 	}
 
-	title := id
 	w.Header().Set("Content-Type", "video/mp4")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.mp4"`, sanitizeFilename(title)))
+	w.Header().Set("Content-Disposition", contentDisposition(id+".mp4"))
 	w.Header().Set("Content-Length", strconv.FormatInt(totalSize, 10))
 
 	initFile, err := os.Open(initPath)

@@ -80,8 +80,11 @@ class Streamixer_Frontend {
 		ob_start();
 		?>
 		<?php
-		$download_url = Streamixer_API::get_download_url( $post_id );
-		$progress_url = Streamixer_API::get_progress_url( $post_id );
+		$download_url    = Streamixer_API::get_download_url( $post_id );
+		$progress_url    = Streamixer_API::get_progress_url( $post_id );
+		$audio_url       = Streamixer_API::get_audio_url( $post_id );
+		$transcript_url  = Streamixer_API::get_transcript_url( $post_id );
+		$has_transcript  = Streamixer_API::has_transcript( $post_id );
 		?>
 		<div class="streamixer-player-container" data-hls-url="<?php echo esc_attr( $stream_url ); ?>">
 			<video class="streamixer-video" controls playsinline>
@@ -95,6 +98,10 @@ class Streamixer_Frontend {
 			data-download-url="<?php echo esc_attr( $download_url ); ?>"
 			data-progress-url="<?php echo esc_attr( $progress_url ); ?>">
 			<button type="button" class="streamixer-download-btn">⬇ 下載影片</button>
+			<a href="<?php echo esc_attr( $audio_url ); ?>" class="streamixer-download-btn streamixer-download-link" download>⬇ 下載音檔</a>
+			<?php if ( $has_transcript ) : ?>
+			<a href="<?php echo esc_attr( $transcript_url ); ?>" class="streamixer-download-btn streamixer-download-link" download>⬇ 下載逐字稿</a>
+			<?php endif; ?>
 			<div class="streamixer-download-progress" style="display:none;">
 				<div class="streamixer-download-progress-bar"><span></span></div>
 				<div class="streamixer-download-progress-text">準備中…</div>

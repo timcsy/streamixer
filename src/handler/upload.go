@@ -54,6 +54,20 @@ func (h *UploadHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		saved = append(saved, "subtitle")
 	}
 
+	// 處理逐字稿（選擇性）：支援上傳或刪除
+	if r.FormValue("transcript_delete") == "1" {
+		removeExistingByPrefix(dir, "transcript")
+		saved = append(saved, "transcript_deleted")
+	} else {
+		// 上傳新逐字稿前先清除既有 transcript.*（避免替換副檔名時殘留舊檔）
+		if _, _, err := r.FormFile("transcript"); err == nil {
+			removeExistingByPrefix(dir, "transcript")
+		}
+		if err := saveFormFile(r, "transcript", dir); err == nil {
+			saved = append(saved, "transcript")
+		}
+	}
+
 	if len(saved) == 0 {
 		writeError(w, http.StatusBadRequest, "未收到任何檔案")
 		return
@@ -85,6 +99,14 @@ func (h *UploadHandler) ListCompositions(w http.ResponseWriter, r *http.Request)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(ids)
+}
+
+// removeExistingByPrefix 移除目錄下所有以 prefix 開頭的檔案（例如 transcript.*）
+func removeExistingByPrefix(dir, prefix string) {
+	matches, _ := filepath.Glob(filepath.Join(dir, prefix+".*"))
+	for _, m := range matches {
+		os.Remove(m)
+	}
 }
 
 func saveFormFile(r *http.Request, fieldName, dir string) error {
