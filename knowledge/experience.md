@@ -74,6 +74,22 @@
 - **教訓**：依賴傳統 meta box 的 CPT，MUST 強制使用傳統編輯器，或改寫成 Gutenberg sidebar panel + `register_post_meta` + REST。混用 Gutenberg 與傳統 meta box 的 `$_POST` 流程會靜默丟資料。
 - **來源**：使用者回報「測試影片讀不到」，追查發現 Gutenberg 儲存路徑未帶 meta box 欄位。
 
+### 已清除本地檔的 WordPress 素材，新增選填欄位 MUST 走增量同步
+
+- **理論說**：`sync_composition` 每次都重新上傳全套檔案（audio+background+可選 subtitle/transcript），即使管理員只動了其中一個選填欄位也無妨。
+- **實際發生**：階段 6 的「同步後自動清除本地檔案」會把 `_streamixer_audio_id` / `_streamixer_background_id` 歸零並刪除 WP attachment 實體檔。之後管理員只想新加逐字稿，`sync_composition` 的前置檢查「若 audio_id 或 background_id 為 0 則回傳 pending」會直接 bail out，逐字稿根本沒送到後端，播放頁點下載得到 404「沒有逐字稿」。
+- **解決方式**：以 `_streamixer_files_cleaned === '1'` 判斷「曾經同步成功」，若為真則進入增量模式：跳過 audio/background 的必填檢查、只把實際有變動的欄位（subtitle/transcript）送到後端；Go `/upload/{id}` 本來就接受任意欄位子集，直接寫入對應檔即可。
+- **教訓**：帶有「同步後清除本地檔」機制的寫入管線 MUST 支援「增量同步」——用可靠的歷史旗標（如 `_streamixer_files_cleaned`）判斷曾經成功，而不是用當下的 sync_status（pending/error 會誤判）。`sync_status` 只記錄最近一次嘗試的結果，不是歷史事實。
+- **來源**：使用者回報「明明上傳了逐字稿卻顯示沒有」，追查發現 `class-api.php` 的 bail-out 條件在本地檔已清除的情境下仍觸發。
+
+### Go `time.NewTicker` 無法動態換頻率，改用 timer + kick channel
+
+- **理論說**：背景清掃用 `time.NewTicker(interval)`，若需要讓使用者在執行期調整頻率，改一下變數下次 tick 就會生效。
+- **實際發生**：`ticker.C` 的發射週期在 `NewTicker` 時就鎖定，後續改 interval 變數對 ticker 毫無影響；若硬要換頻率得 `ticker.Stop()` 再 `NewTicker`，但這需要跳脫現有的 `for range ticker.C` 迴圈結構。加上「WP 設定頁可即時調整清掃頻率」需求時，原本的 Sweeper 無法滿足。
+- **解決方式**：改寫為 `for { timer := time.NewTimer(getInterval()); select { <-timer.C: ...; <-kick: ...; <-stop: ... } }`；`SetInterval` 更新欄位後往 `kick` 丟一個訊號，讓迴圈立即重建 timer 以新頻率起算。
+- **教訓**：需要在執行期動態調整頻率的排程迴圈 MUST 使用每輪重建的 `time.NewTimer` + kick channel，不得依賴 `time.NewTicker`。同理適用於所有「初始化時鎖定、之後不可調整」的 Go 標準函式庫原語。
+- **來源**：階段 8.5 把快取清掃頻率搬到 WP 設定頁時，發現既有 `Sweeper` 架構無法支援執行期調整。
+
 ### WordPress post_name 已是 URL 編碼，不需再 encode
 
 - **理論說**：組合 URL 時應該用 `rawurlencode()` 或 `urlencode()` 編碼路徑段，確保特殊字元被正確處理。

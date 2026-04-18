@@ -45,6 +45,23 @@ class Streamixer_Settings {
 			'default'           => 0,
 		) );
 
+		// 快取設定（同步到 Streamixer 後端）
+		register_setting( 'streamixer_options', 'streamixer_cache_ttl', array(
+			'type'              => 'string',
+			'sanitize_callback' => 'sanitize_text_field',
+			'default'           => '30m',
+		) );
+		register_setting( 'streamixer_options', 'streamixer_cache_sweep_interval', array(
+			'type'              => 'string',
+			'sanitize_callback' => 'sanitize_text_field',
+			'default'           => '5m',
+		) );
+		register_setting( 'streamixer_options', 'streamixer_cache_max_size_mb', array(
+			'type'              => 'integer',
+			'sanitize_callback' => 'absint',
+			'default'           => 0,
+		) );
+
 		add_settings_section(
 			'streamixer_main',
 			'服務設定',
@@ -91,6 +108,130 @@ class Streamixer_Settings {
 			'streamixer-settings',
 			'streamixer_main'
 		);
+
+		// 快取設定區塊
+		add_settings_section(
+			'streamixer_cache',
+			'影片快取設定',
+			array( __CLASS__, 'render_cache_section_intro' ),
+			'streamixer-settings'
+		);
+
+		add_settings_field(
+			'streamixer_cache_ttl',
+			'快取過期時間 (TTL)',
+			array( __CLASS__, 'render_cache_ttl_field' ),
+			'streamixer-settings',
+			'streamixer_cache'
+		);
+
+		add_settings_field(
+			'streamixer_cache_sweep_interval',
+			'清掃頻率',
+			array( __CLASS__, 'render_cache_sweep_field' ),
+			'streamixer-settings',
+			'streamixer_cache'
+		);
+
+		add_settings_field(
+			'streamixer_cache_max_size_mb',
+			'快取容量上限 (MB)',
+			array( __CLASS__, 'render_cache_max_size_field' ),
+			'streamixer-settings',
+			'streamixer_cache'
+		);
+
+		// 儲存後 push 到 Streamixer 後端
+		add_action( 'update_option_streamixer_cache_ttl', array( __CLASS__, 'push_cache_config' ), 10, 0 );
+		add_action( 'update_option_streamixer_cache_sweep_interval', array( __CLASS__, 'push_cache_config' ), 10, 0 );
+		add_action( 'update_option_streamixer_cache_max_size_mb', array( __CLASS__, 'push_cache_config' ), 10, 0 );
+	}
+
+	public static function render_cache_section_intro() {
+		$current = self::fetch_current_cache_config();
+		echo '<p>這些設定會即時套用到 Streamixer 後端（不需重啟容器）。</p>';
+		if ( $current ) {
+			$usage_mb = round( $current['cache_usage_bytes'] / 1048576, 1 );
+			echo '<p><strong>後端目前狀態：</strong>TTL ' . esc_html( $current['cache_ttl'] )
+				. '、清掃頻率 ' . esc_html( $current['cache_sweep_interval'] )
+				. '、容量上限 ' . ( $current['cache_max_size'] > 0 ? esc_html( round( $current['cache_max_size'] / 1048576 ) ) . ' MB' : '不限制' )
+				. '、目前使用 ' . esc_html( $usage_mb ) . ' MB</p>';
+		} else {
+			echo '<p><em>無法取得後端狀態，請確認 Streamixer 服務連線正常。</em></p>';
+		}
+	}
+
+	public static function render_cache_ttl_field() {
+		$value = get_option( 'streamixer_cache_ttl', '30m' );
+		?>
+		<input type="text" name="streamixer_cache_ttl"
+		       value="<?php echo esc_attr( $value ); ?>"
+		       class="regular-text" placeholder="30m">
+		<p class="description">素材無人存取多久後清除快取分段。格式：<code>30m</code>、<code>1h</code>、<code>2h30m</code>。至少 1 秒。</p>
+		<?php
+	}
+
+	public static function render_cache_sweep_field() {
+		$value = get_option( 'streamixer_cache_sweep_interval', '5m' );
+		?>
+		<input type="text" name="streamixer_cache_sweep_interval"
+		       value="<?php echo esc_attr( $value ); ?>"
+		       class="regular-text" placeholder="5m">
+		<p class="description">背景清掃排程的執行間隔。格式同上。至少 10 秒。</p>
+		<?php
+	}
+
+	public static function render_cache_max_size_field() {
+		$value = get_option( 'streamixer_cache_max_size_mb', 0 );
+		?>
+		<input type="number" name="streamixer_cache_max_size_mb"
+		       value="<?php echo esc_attr( $value ); ?>"
+		       min="0" step="1" class="small-text"> MB
+		<p class="description">tmpfs 快取容量上限。填 0 表示不限制（但仍受 tmpfs 本身大小限制）。超過上限時會以 LRU 淘汰最久未用的素材。</p>
+		<?php
+	}
+
+	/**
+	 * 將 WordPress 設定 push 至 Streamixer 後端 /config
+	 */
+	public static function push_cache_config() {
+		$url = Streamixer_API::get_service_url() . '/config';
+		$ttl       = get_option( 'streamixer_cache_ttl', '30m' );
+		$sweep     = get_option( 'streamixer_cache_sweep_interval', '5m' );
+		$mb        = (int) get_option( 'streamixer_cache_max_size_mb', 0 );
+		$payload   = array(
+			'cache_ttl'            => $ttl,
+			'cache_sweep_interval' => $sweep,
+			'cache_max_size'       => $mb * 1048576,
+		);
+		$headers   = array( 'Content-Type' => 'application/json' );
+		$api_key = get_option( 'streamixer_api_key', '' );
+		if ( ! empty( $api_key ) ) {
+			$headers['X-API-Key'] = $api_key;
+		}
+		wp_remote_request( $url, array(
+			'method'  => 'PUT',
+			'timeout' => 10,
+			'headers' => $headers,
+			'body'    => wp_json_encode( $payload ),
+		) );
+	}
+
+	/**
+	 * 從 Streamixer 後端讀取目前快取設定
+	 */
+	public static function fetch_current_cache_config() {
+		$url      = Streamixer_API::get_service_url() . '/config';
+		$response = wp_remote_get( $url, array( 'timeout' => 5 ) );
+		if ( is_wp_error( $response ) ) {
+			return null;
+		}
+		$body = wp_remote_retrieve_body( $response );
+		$data = json_decode( $body, true );
+		if ( ! is_array( $data ) ) {
+			return null;
+		}
+		return $data;
 	}
 
 	public static function render_url_field() {

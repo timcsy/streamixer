@@ -30,41 +30,55 @@ class Streamixer_API {
 		$audio_id      = get_post_meta( $post_id, '_streamixer_audio_id', true );
 		$background_id = get_post_meta( $post_id, '_streamixer_background_id', true );
 		$subtitle_id   = get_post_meta( $post_id, '_streamixer_subtitle_id', true );
+		$transcript_id = get_post_meta( $post_id, '_streamixer_transcript_id', true );
 
-		if ( ! $audio_id || ! $background_id ) {
-			// 音檔和背景為必填，如果有預設背景則使用
-			if ( ! $background_id ) {
-				$background_id = get_option( 'streamixer_default_background', 0 );
-			}
+		// files_cleaned 僅在同步成功後才會設為 1，可用來判斷「曾經同步成功」
+		$files_cleaned  = get_post_meta( $post_id, '_streamixer_files_cleaned', true );
+		$is_incremental = (bool) $files_cleaned; // 之前已同步且本地清除，此次僅更新選填欄位
+
+		if ( ! $is_incremental ) {
 			if ( ! $audio_id || ! $background_id ) {
-				update_post_meta( $post_id, '_streamixer_sync_status', 'pending' );
-				update_post_meta( $post_id, '_streamixer_sync_error', '缺少音檔或背景圖片' );
-				return false;
+				if ( ! $background_id ) {
+					$background_id = get_option( 'streamixer_default_background', 0 );
+				}
+				if ( ! $audio_id || ! $background_id ) {
+					update_post_meta( $post_id, '_streamixer_sync_status', 'pending' );
+					update_post_meta( $post_id, '_streamixer_sync_error', '缺少音檔或背景圖片' );
+					return false;
+				}
 			}
 		}
 
 		$composition_id = self::get_composition_id( $post_id );
 		$url            = self::get_service_url() . '/upload/' . $composition_id;
 
-		// 驗證檔案存在
-		$audio_path = get_attached_file( $audio_id );
-		$bg_path    = get_attached_file( $background_id );
-		if ( ! $audio_path || ! file_exists( $audio_path ) ) {
-			update_post_meta( $post_id, '_streamixer_sync_status', 'error' );
-			update_post_meta( $post_id, '_streamixer_sync_error', '音檔不存在（可能已被刪除），請重新上傳音檔' );
-			return false;
-		}
-		if ( ! $bg_path || ! file_exists( $bg_path ) ) {
-			update_post_meta( $post_id, '_streamixer_sync_status', 'error' );
-			update_post_meta( $post_id, '_streamixer_sync_error', '背景圖片不存在（可能已被刪除），請重新上傳圖片' );
-			return false;
+		// 驗證音檔與背景（非增量模式才強制）
+		$audio_path = $audio_id ? get_attached_file( $audio_id ) : '';
+		$bg_path    = $background_id ? get_attached_file( $background_id ) : '';
+
+		if ( ! $is_incremental ) {
+			if ( ! $audio_path || ! file_exists( $audio_path ) ) {
+				update_post_meta( $post_id, '_streamixer_sync_status', 'error' );
+				update_post_meta( $post_id, '_streamixer_sync_error', '音檔不存在（可能已被刪除），請重新上傳音檔' );
+				return false;
+			}
+			if ( ! $bg_path || ! file_exists( $bg_path ) ) {
+				update_post_meta( $post_id, '_streamixer_sync_status', 'error' );
+				update_post_meta( $post_id, '_streamixer_sync_error', '背景圖片不存在（可能已被刪除），請重新上傳圖片' );
+				return false;
+			}
 		}
 
 		// 準備 multipart 上傳
 		$boundary = wp_generate_password( 24, false );
 		$body     = '';
-		$body    .= self::build_multipart_field( $boundary, 'audio', $audio_path );
-		$body    .= self::build_multipart_field( $boundary, 'background', $bg_path );
+
+		if ( $audio_path && file_exists( $audio_path ) ) {
+			$body .= self::build_multipart_field( $boundary, 'audio', $audio_path );
+		}
+		if ( $bg_path && file_exists( $bg_path ) ) {
+			$body .= self::build_multipart_field( $boundary, 'background', $bg_path );
+		}
 
 		// 字幕（選填）
 		if ( $subtitle_id ) {
@@ -72,6 +86,25 @@ class Streamixer_API {
 			if ( $sub_path && file_exists( $sub_path ) ) {
 				$body .= self::build_multipart_field( $boundary, 'subtitle', $sub_path );
 			}
+		}
+
+		// 逐字稿（選填）
+		$had_transcript = (bool) get_post_meta( $post_id, '_streamixer_transcript_id_filename', true );
+		if ( $transcript_id ) {
+			$transcript_path = get_attached_file( $transcript_id );
+			if ( $transcript_path && file_exists( $transcript_path ) ) {
+				$body .= self::build_multipart_field( $boundary, 'transcript', $transcript_path );
+			}
+		} elseif ( $had_transcript ) {
+			// 管理員曾有逐字稿、現已清除 → 通知後端刪除 transcript.*
+			$body .= "--{$boundary}\r\n" .
+				"Content-Disposition: form-data; name=\"transcript_delete\"\r\n\r\n" .
+				"1\r\n";
+		}
+
+		// 增量同步時若沒有任何新上傳欄位，也跳過（避免空 multipart 被拒）
+		if ( $is_incremental && '' === $body ) {
+			return true;
 		}
 
 		$body .= "--{$boundary}--\r\n";
@@ -147,11 +180,28 @@ class Streamixer_API {
 		return self::get_public_url() . '/progress/' . $composition_id;
 	}
 
+	public static function get_audio_url( $post_id ) {
+		$composition_id = self::get_composition_id( $post_id );
+		return self::get_public_url() . '/audio/' . $composition_id;
+	}
+
+	public static function get_transcript_url( $post_id ) {
+		$composition_id = self::get_composition_id( $post_id );
+		return self::get_public_url() . '/transcript/' . $composition_id;
+	}
+
+	public static function has_transcript( $post_id ) {
+		if ( get_post_meta( $post_id, '_streamixer_transcript_id', true ) ) {
+			return true;
+		}
+		return (bool) get_post_meta( $post_id, '_streamixer_transcript_id_filename', true );
+	}
+
 	/**
 	 * 清除本地素材檔案（連同 WordPress attachment 一併刪除，保留檔名到 post meta）
 	 */
 	public static function cleanup_local_files( $post_id ) {
-		$fields = array( '_streamixer_audio_id', '_streamixer_background_id', '_streamixer_subtitle_id' );
+		$fields = array( '_streamixer_audio_id', '_streamixer_background_id', '_streamixer_subtitle_id', '_streamixer_transcript_id' );
 
 		foreach ( $fields as $field ) {
 			$attachment_id = get_post_meta( $post_id, $field, true );

@@ -72,6 +72,11 @@ func apiKeyMiddleware(apiKey string) func(http.Handler) http.Handler {
 
 // SetupRouter 建立包含所有路由的 chi router
 func SetupRouter(h *StreamHandler, uh *UploadHandler, sh *SampleHandler, cfg config.Config) http.Handler {
+	return SetupRouterWithSweeper(h, uh, sh, cfg, nil)
+}
+
+// SetupRouterWithSweeper 同 SetupRouter，但接受 sweeper 以啟用 /config 端點
+func SetupRouterWithSweeper(h *StreamHandler, uh *UploadHandler, sh *SampleHandler, cfg config.Config, sweeper *composer.Sweeper) http.Handler {
 	r := chi.NewRouter()
 	r.Use(corsMiddleware(cfg.CORSOrigins))
 	r.Get("/health", HealthHandler)
@@ -80,6 +85,13 @@ func SetupRouter(h *StreamHandler, uh *UploadHandler, sh *SampleHandler, cfg con
 	authMw := apiKeyMiddleware(cfg.APIKey)
 	r.With(authMw).Post("/upload/{id}", uh.Upload)
 	r.With(authMw).Post("/sample", sh.GenerateSample)
+
+	// 快取設定端點（GET 公開、PUT 需認證）
+	if sweeper != nil {
+		ch := NewConfigHandler(h.cache, sweeper)
+		r.Get("/config", ch.Get)
+		r.With(authMw).Put("/config", ch.Put)
+	}
 
 	r.Get("/compositions", uh.ListCompositions)
 	r.Get("/stream/{id}/index.m3u8", h.PlaylistHandler)
@@ -90,6 +102,11 @@ func SetupRouter(h *StreamHandler, uh *UploadHandler, sh *SampleHandler, cfg con
 	dh := NewDownloadHandler(cfg, h.pregen)
 	r.Get("/download/{id}", dh.Download)
 	r.Get("/progress/{id}", dh.Progress)
+
+	// 原始媒體下載端點（音檔、逐字稿）
+	mdh := NewMediaDownloadHandler(cfg)
+	r.Get("/audio/{id}", mdh.Audio)
+	r.Get("/transcript/{id}", mdh.Transcript)
 
 	// 靜態檔案（前端）
 	staticDir := http.Dir("static")

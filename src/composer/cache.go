@@ -19,11 +19,39 @@ type CacheEntry struct {
 
 // CacheManager 管理 tmpfs 中合成分段的快取
 type CacheManager struct {
-	tmpDir   string
-	ttl      time.Duration
-	maxSize  int64
-	mu       sync.RWMutex
-	entries  map[string]*CacheEntry
+	tmpDir  string
+	ttl     time.Duration
+	maxSize int64
+	mu      sync.RWMutex
+	entries map[string]*CacheEntry
+}
+
+// GetTTL 取得目前 TTL 設定
+func (cm *CacheManager) GetTTL() time.Duration {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+	return cm.ttl
+}
+
+// SetTTL 動態更新 TTL
+func (cm *CacheManager) SetTTL(d time.Duration) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	cm.ttl = d
+}
+
+// GetMaxSize 取得目前容量上限
+func (cm *CacheManager) GetMaxSize() int64 {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+	return cm.maxSize
+}
+
+// SetMaxSize 動態更新容量上限（bytes，0 = 不限制）
+func (cm *CacheManager) SetMaxSize(n int64) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	cm.maxSize = n
 }
 
 // NewCacheManager 建立快取管理器

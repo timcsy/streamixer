@@ -35,12 +35,14 @@ func (l *Loader) Load(id string) (*MediaComposition, error) {
 	}
 
 	subtitle := l.findSubtitle(dir)
+	transcript := l.findTranscript(dir)
 
 	return &MediaComposition{
 		ID:         id,
 		Audio:      *audio,
 		Background: *bg,
 		Subtitle:   subtitle,
+		Transcript: transcript,
 	}, nil
 }
 
@@ -69,6 +71,17 @@ func (l *Loader) findSubtitle(dir string) *Subtitle {
 		path := filepath.Join(dir, "subtitle"+ext)
 		if _, err := os.Stat(path); err == nil {
 			return &Subtitle{Path: path, Format: ext[1:]}
+		}
+	}
+	return nil
+}
+
+func (l *Loader) findTranscript(dir string) *Transcript {
+	for _, ext := range SupportedTranscriptFormats() {
+		path := filepath.Join(dir, "transcript"+ext)
+		info, err := os.Stat(path)
+		if err == nil && !info.IsDir() {
+			return &Transcript{Path: path, Format: ext[1:], Size: info.Size()}
 		}
 	}
 	return nil

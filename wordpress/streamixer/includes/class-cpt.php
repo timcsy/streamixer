@@ -85,12 +85,14 @@ class Streamixer_CPT {
 		$audio_id      = get_post_meta( $post->ID, '_streamixer_audio_id', true );
 		$background_id = get_post_meta( $post->ID, '_streamixer_background_id', true );
 		$subtitle_id   = get_post_meta( $post->ID, '_streamixer_subtitle_id', true );
+		$transcript_id = get_post_meta( $post->ID, '_streamixer_transcript_id', true );
 		$sync_status   = get_post_meta( $post->ID, '_streamixer_sync_status', true );
 		$sync_error    = get_post_meta( $post->ID, '_streamixer_sync_error', true );
 
-		$audio_url = $audio_id ? wp_get_attachment_url( $audio_id ) : '';
-		$bg_url    = $background_id ? wp_get_attachment_url( $background_id ) : '';
-		$sub_url   = $subtitle_id ? wp_get_attachment_url( $subtitle_id ) : '';
+		$audio_url      = $audio_id ? wp_get_attachment_url( $audio_id ) : '';
+		$bg_url         = $background_id ? wp_get_attachment_url( $background_id ) : '';
+		$sub_url        = $subtitle_id ? wp_get_attachment_url( $subtitle_id ) : '';
+		$transcript_url = $transcript_id ? wp_get_attachment_url( $transcript_id ) : '';
 		?>
 		<style>
 			.streamixer-field { margin-bottom: 15px; }
@@ -107,10 +109,10 @@ class Streamixer_CPT {
 			.streamixer-copied { color: #155724; font-size: 12px; display: none; }
 		</style>
 
-		<?php if ( 'publish' === $post->post_status && $post->post_name ) : ?>
+		<?php if ( 'publish' === $post->post_status ) : ?>
 		<div class="streamixer-shortcode-box">
 			<span>嵌入碼：</span>
-			<code id="streamixer_shortcode">[streamixer id="<?php echo esc_attr( $post->post_name ); ?>"]</code>
+			<code id="streamixer_shortcode">[streamixer id="<?php echo esc_attr( $post->ID ); ?>"]</code>
 			<button type="button" class="button" onclick="navigator.clipboard.writeText(document.getElementById('streamixer_shortcode').textContent).then(function(){var el=document.getElementById('streamixer_copied');el.style.display='inline';setTimeout(function(){el.style.display='none'},2000)})">複製</button>
 			<span class="streamixer-copied" id="streamixer_copied">✓ 已複製</span>
 		</div>
@@ -125,9 +127,10 @@ class Streamixer_CPT {
 			return ( $path && file_exists( $path ) );
 		};
 
-		$audio_exists = $check_file( $audio_id );
-		$bg_exists    = $check_file( $background_id );
-		$sub_exists   = $check_file( $subtitle_id );
+		$audio_exists      = $check_file( $audio_id );
+		$bg_exists         = $check_file( $background_id );
+		$sub_exists        = $check_file( $subtitle_id );
+		$transcript_exists = $check_file( $transcript_id );
 
 		$audio_display = $audio_url ? esc_html( basename( $audio_url ) ) : '未選擇';
 		if ( ! $audio_id && $files_cleaned ) {
@@ -151,6 +154,19 @@ class Streamixer_CPT {
 			$sub_display = $saved_name ? esc_html( $saved_name ) . '（已同步至 Streamixer，本地已清除）' : '未選擇';
 		} elseif ( $subtitle_id && ! $sub_exists ) {
 			$sub_display = '⚠ 已選擇但檔案不存在（請重新上傳）';
+		}
+
+		$transcript_display = $transcript_url ? esc_html( basename( $transcript_url ) ) : '未選擇';
+		if ( ! $transcript_id && $files_cleaned ) {
+			$saved_name         = get_post_meta( $post->ID, '_streamixer_transcript_id_filename', true );
+			$transcript_display = $saved_name ? esc_html( $saved_name ) . '（已同步至 Streamixer，本地已清除）' : '未選擇';
+		} elseif ( ! $transcript_id ) {
+			$saved_name = get_post_meta( $post->ID, '_streamixer_transcript_id_filename', true );
+			if ( $saved_name ) {
+				$transcript_display = esc_html( $saved_name ) . '（已同步至 Streamixer，本地已清除）';
+			}
+		} elseif ( $transcript_id && ! $transcript_exists ) {
+			$transcript_display = '⚠ 已選擇但檔案不存在（請重新上傳）';
 		}
 		?>
 
@@ -176,6 +192,14 @@ class Streamixer_CPT {
 			<button type="button" class="button" id="streamixer_subtitle_btn">選擇字幕</button>
 			<button type="button" class="button" id="streamixer_subtitle_clear">清除</button>
 			<div class="streamixer-preview" id="streamixer_subtitle_preview"><?php echo $sub_display; ?></div>
+		</div>
+
+		<div class="streamixer-field">
+			<label>逐字稿（TXT / PDF / DOC / DOCX / MD，選填）</label>
+			<input type="hidden" name="streamixer_transcript_id" id="streamixer_transcript_id" value="<?php echo esc_attr( $transcript_id ); ?>">
+			<button type="button" class="button" id="streamixer_transcript_btn">選擇逐字稿</button>
+			<button type="button" class="button" id="streamixer_transcript_clear">清除</button>
+			<div class="streamixer-preview" id="streamixer_transcript_preview"><?php echo $transcript_display; ?></div>
 		</div>
 
 		<?php if ( $sync_status ) : ?>
@@ -229,6 +253,7 @@ class Streamixer_CPT {
 			setupMediaButton('streamixer_audio_btn', 'streamixer_audio_clear', 'streamixer_audio_id', 'streamixer_audio_preview', 'audio');
 			setupMediaButton('streamixer_background_btn', 'streamixer_background_clear', 'streamixer_background_id', 'streamixer_background_preview', 'image');
 			setupMediaButton('streamixer_subtitle_btn', 'streamixer_subtitle_clear', 'streamixer_subtitle_id', 'streamixer_subtitle_preview', 'text');
+			setupMediaButton('streamixer_transcript_btn', 'streamixer_transcript_clear', 'streamixer_transcript_id', 'streamixer_transcript_preview', 'application');
 		});
 		</script>
 		<?php
@@ -245,7 +270,7 @@ class Streamixer_CPT {
 			return;
 		}
 
-		$fields = array( 'streamixer_audio_id', 'streamixer_background_id', 'streamixer_subtitle_id' );
+		$fields = array( 'streamixer_audio_id', 'streamixer_background_id', 'streamixer_subtitle_id', 'streamixer_transcript_id' );
 		foreach ( $fields as $field ) {
 			$value = isset( $_POST[ $field ] ) ? intval( $_POST[ $field ] ) : 0;
 			update_post_meta( $post_id, '_' . $field, $value );
