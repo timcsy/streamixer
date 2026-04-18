@@ -10,7 +10,7 @@ Streamixer 是一個即時合成串流服務：將分開儲存的音檔、背景
 
 ## 現狀
 
-階段 1 至 7 已完成並發布 v1.4.0。Go 串流服務使用 fMP4（CMAF）分段格式、背景預生成、LRU+TTL 快取管理、API Key 認證、可設定 CORS、影片下載（MP4）。WordPress 外掛提供後台素材管理、Shortcode 與 Gutenberg Block 嵌入、響應式播放頁面、同步後自動清除本地檔案、下載按鈕與批次匯出。階段 7.5 進行中：下載等待 `EXT-X-ENDLIST` 確保影片完整、`/progress/{id}` 端點與前端進度條、字幕樣式可調（MarginV=30、Fontsize=28）、後端目錄採用 `urldecode(post_name)` 的可讀中文名稱、CPT 強制使用傳統編輯器避免 Gutenberg 丟失 meta box 欄位。
+階段 1 至 7.5 已完成並發布 v1.5.0。Go 串流服務使用 fMP4（CMAF）分段格式、背景預生成、LRU+TTL 快取管理、API Key 認證、可設定 CORS、影片下載（完整檔案 + 進度端點）。WordPress 外掛提供後台素材管理、Shortcode 與 Gutenberg Block 嵌入、響應式播放頁面、同步後自動清除本地檔案、下載進度條、批次匯出；字幕樣式避開播放器控制列；後端目錄採用可讀中文名稱；CPT 強制傳統編輯器避免 Gutenberg 丟失 meta box 欄位。
 
 ## 架構
 
@@ -51,28 +51,7 @@ Streamixer 是一個即時合成串流服務：將分開儲存的音檔、背景
 - [x] **階段 5：發布準備** — README、LICENSE、GitHub Actions CI/CD、API Key、CORS
 - [x] **階段 6：同步後清除 WordPress 端檔案** — 自動刪除本地檔案節省空間
 - [x] **階段 7：影片下載功能** — `/download/{id}` 端點、播放器下載按鈕、後台批次匯出
-
-### 進行中
-
-### 階段 7.5：下載體驗與素材管理修正
-
-- [ ] 發版
-
-交付：影片下載必為完整檔、前端顯示合成進度；素材目錄名稱可讀；Gutenberg 儲存不再遺失 meta box 欄位；字幕位置與字體大小可避開播放器控制列。
-前置條件：階段 7
-
-**功能**：
-- 下載端點等待 `EXT-X-ENDLIST` 並比對分段數，避免截斷影片
-- 新增 `/progress/{id}` 回傳 `{status, done, total, percent, ready}`，前端輪詢並顯示進度條
-- 字幕樣式固定為 `MarginV=30,Fontsize=28`，避免被播放器控制列遮住
-- Streamixer 後端資料夾使用 `urldecode(post_name)` 的可讀中文名稱
-- streamixer CPT 強制使用傳統編輯器，避免 Gutenberg REST 儲存路徑遺漏 meta box 欄位
-
-**成功標準：**
-- [ ] 長音檔（≥ 30 分鐘）下載為完整 MP4，沒有截斷
-- [ ] 合成尚未完成時按下下載可看到進度條與百分比
-- [ ] Gutenberg/傳統編輯器皆能正確儲存素材 id，目錄名稱為可讀中文
-- [ ] 字幕不被播放列遮蔽且字體大小清晰可讀
+- [x] **階段 7.5：下載體驗與素材管理修正** — 等待 `EXT-X-ENDLIST` 保完整、`/progress/{id}` 進度端點、字幕樣式避開控制列、可讀中文目錄、CPT 強制傳統編輯器
 
 ### 待完成
 
