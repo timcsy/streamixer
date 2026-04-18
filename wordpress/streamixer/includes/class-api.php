@@ -46,21 +46,25 @@ class Streamixer_API {
 		$composition_id = self::get_composition_id( $post_id );
 		$url            = self::get_service_url() . '/upload/' . $composition_id;
 
+		// 驗證檔案存在
+		$audio_path = get_attached_file( $audio_id );
+		$bg_path    = get_attached_file( $background_id );
+		if ( ! $audio_path || ! file_exists( $audio_path ) ) {
+			update_post_meta( $post_id, '_streamixer_sync_status', 'error' );
+			update_post_meta( $post_id, '_streamixer_sync_error', '音檔不存在（可能已被刪除），請重新上傳音檔' );
+			return false;
+		}
+		if ( ! $bg_path || ! file_exists( $bg_path ) ) {
+			update_post_meta( $post_id, '_streamixer_sync_status', 'error' );
+			update_post_meta( $post_id, '_streamixer_sync_error', '背景圖片不存在（可能已被刪除），請重新上傳圖片' );
+			return false;
+		}
+
 		// 準備 multipart 上傳
 		$boundary = wp_generate_password( 24, false );
 		$body     = '';
-
-		// 音檔
-		$audio_path = get_attached_file( $audio_id );
-		if ( $audio_path && file_exists( $audio_path ) ) {
-			$body .= self::build_multipart_field( $boundary, 'audio', $audio_path );
-		}
-
-		// 背景圖片
-		$bg_path = get_attached_file( $background_id );
-		if ( $bg_path && file_exists( $bg_path ) ) {
-			$body .= self::build_multipart_field( $boundary, 'background', $bg_path );
-		}
+		$body    .= self::build_multipart_field( $boundary, 'audio', $audio_path );
+		$body    .= self::build_multipart_field( $boundary, 'background', $bg_path );
 
 		// 字幕（選填）
 		if ( $subtitle_id ) {
@@ -114,10 +118,15 @@ class Streamixer_API {
 
 	/**
 	 * 取得素材組合的 Streamixer ID（使用 post slug）
+	 * WordPress 的 post_name 對中文會 URL 編碼（如 %e6%b8%ac），
+	 * decode 後才是可讀的目錄名稱
 	 */
 	public static function get_composition_id( $post_id ) {
 		$post = get_post( $post_id );
-		return $post ? $post->post_name : 'post-' . $post_id;
+		if ( ! $post ) {
+			return 'post-' . $post_id;
+		}
+		return urldecode( $post->post_name );
 	}
 
 	/**
@@ -133,8 +142,13 @@ class Streamixer_API {
 		return self::get_public_url() . '/stream/' . $composition_id . '/index.m3u8';
 	}
 
+	public static function get_progress_url( $post_id ) {
+		$composition_id = self::get_composition_id( $post_id );
+		return self::get_public_url() . '/progress/' . $composition_id;
+	}
+
 	/**
-	 * 清除本地素材檔案（保留 attachment 記錄）
+	 * 清除本地素材檔案（連同 WordPress attachment 一併刪除，保留檔名到 post meta）
 	 */
 	public static function cleanup_local_files( $post_id ) {
 		$fields = array( '_streamixer_audio_id', '_streamixer_background_id', '_streamixer_subtitle_id' );
@@ -147,33 +161,16 @@ class Streamixer_API {
 
 			// 記錄原始檔名（清除後仍可顯示）
 			$file_path = get_attached_file( $attachment_id );
-			if ( ! $file_path || ! file_exists( $file_path ) ) {
-				continue; // 已經清除過
+			if ( $file_path ) {
+				$filename = basename( $file_path );
+				update_post_meta( $post_id, $field . '_filename', $filename );
 			}
 
-			$filename = basename( $file_path );
-			update_post_meta( $post_id, $field . '_filename', $filename );
+			// 完整刪除 WordPress attachment（含檔案、縮圖、資料庫記錄）
+			wp_delete_attachment( $attachment_id, true );
 
-			// 刪除實際檔案（含縮圖等衍生檔案）
-			$metadata = wp_get_attachment_metadata( $attachment_id );
-			$upload_dir = wp_upload_dir();
-			$base_dir = $upload_dir['basedir'];
-
-			// 刪除原始檔案
-			if ( file_exists( $file_path ) ) {
-				unlink( $file_path );
-			}
-
-			// 刪除縮圖等衍生檔案
-			if ( $metadata && isset( $metadata['sizes'] ) ) {
-				$file_dir = dirname( $file_path );
-				foreach ( $metadata['sizes'] as $size ) {
-					$thumb_path = $file_dir . '/' . $size['file'];
-					if ( file_exists( $thumb_path ) ) {
-						unlink( $thumb_path );
-					}
-				}
-			}
+			// 清除 post meta 中的 attachment ID（保留 _filename）
+			update_post_meta( $post_id, $field, 0 );
 		}
 
 		update_post_meta( $post_id, '_streamixer_files_cleaned', '1' );

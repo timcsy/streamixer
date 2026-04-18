@@ -58,6 +58,22 @@
 - **教訓**：WordPress 中含有 percent-encoded 字元的 URL，在 HTML 屬性中 MUST 使用 `esc_attr()` 而非 `esc_url()`。`esc_url()` 會重新編碼 `%` 字元，破壞已編碼的 URL。
 - **來源**：階段 4 WordPress 外掛中中文素材 slug 的播放 URL 錯誤
 
+### HLS 預生成下載 MUST 等 EXT-X-ENDLIST 而非首段
+
+- **理論說**：下載端點只要等 playlist 就緒（`WaitForPlaylist`，出現第一個 `.m4s` 就回傳）就能把所有分段串接為完整 MP4。
+- **實際發生**：`WaitForPlaylist` 在首段產出時即返回，下載 handler 接著 `ReadDir` 收集當下已存在的分段，對長音檔（FFmpeg 尚未寫完）只拿到前幾段，使用者得到被截斷的影片檔。
+- **解決方式**：新增 `WaitForComplete`，要求任務狀態為 `PregenCompleted` 且 playlist 含 `#EXT-X-ENDLIST` 才放行；下載前再用 `SegmentCount(duration)` 驗證實際分段數不少於預期。同時加上 `/progress/{id}` 端點讓前端輪詢進度。
+- **教訓**：預生成是異步的，「playlist 存在」不等於「全部分段就緒」。任何需要整份媒體的端點（下載、打包、封存）MUST 等 `EXT-X-ENDLIST` 並比對分段數，不可只等首段。
+- **來源**：使用者回報「下載影片檔不完整」，追查發現 `src/handler/download.go` 的等待條件錯誤。
+
+### Gutenberg 編輯器不觸發傳統 meta box 的 $_POST save
+
+- **理論說**：WordPress 的 `save_post` hook 會在文章儲存時觸發，傳統 meta box 裡的 `<input name="...">` 會透過 `$_POST` 傳進來，不論編輯器是 Gutenberg 或 Classic。
+- **實際發生**：streamixer CPT 的素材選擇（音檔、背景、字幕）透過傳統 meta box + hidden input 送出。Gutenberg 編輯器改用 REST API 儲存文章，`$_POST` 裡沒有 meta box 欄位，`save_meta` 收到的全是 0，素材 id 被清空，導致 `/media/{id}/` 目錄空白，串流回 404。
+- **解決方式**：對 streamixer CPT 強制使用傳統編輯器（`use_block_editor_for_post_type` filter 回傳 false）。
+- **教訓**：依賴傳統 meta box 的 CPT，MUST 強制使用傳統編輯器，或改寫成 Gutenberg sidebar panel + `register_post_meta` + REST。混用 Gutenberg 與傳統 meta box 的 `$_POST` 流程會靜默丟資料。
+- **來源**：使用者回報「測試影片讀不到」，追查發現 Gutenberg 儲存路徑未帶 meta box 欄位。
+
 ### WordPress post_name 已是 URL 編碼，不需再 encode
 
 - **理論說**：組合 URL 時應該用 `rawurlencode()` 或 `urlencode()` 編碼路徑段，確保特殊字元被正確處理。

@@ -81,6 +81,7 @@ class Streamixer_Frontend {
 		?>
 		<?php
 		$download_url = Streamixer_API::get_download_url( $post_id );
+		$progress_url = Streamixer_API::get_progress_url( $post_id );
 		?>
 		<div class="streamixer-player-container" data-hls-url="<?php echo esc_attr( $stream_url ); ?>">
 			<video class="streamixer-video" controls playsinline>
@@ -90,8 +91,14 @@ class Streamixer_Frontend {
 				無法載入串流，請稍後再試。
 			</div>
 		</div>
-		<div class="streamixer-player-toolbar">
-			<a href="<?php echo esc_attr( $download_url ); ?>" class="streamixer-download-btn" download>⬇ 下載影片</a>
+		<div class="streamixer-player-toolbar"
+			data-download-url="<?php echo esc_attr( $download_url ); ?>"
+			data-progress-url="<?php echo esc_attr( $progress_url ); ?>">
+			<button type="button" class="streamixer-download-btn">⬇ 下載影片</button>
+			<div class="streamixer-download-progress" style="display:none;">
+				<div class="streamixer-download-progress-bar"><span></span></div>
+				<div class="streamixer-download-progress-text">準備中…</div>
+			</div>
 		</div>
 		<?php
 		return ob_get_clean();

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -32,6 +33,61 @@ func NewDownloadHandler(cfg config.Config, pregen *composer.PregenManager) *Down
 	}
 }
 
+// Progress 回傳預生成進度（JSON）
+func (h *DownloadHandler) Progress(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	comp, err := h.loader.Load(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	duration, err := composer.ProbeDuration(comp.Audio.Path)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("無法讀取音檔資訊：%v", err))
+		return
+	}
+
+	total := composer.SegmentCount(duration, h.cfg.SegmentDuration)
+	// 若尚未啟動預生成，啟動之
+	h.pregen.StartPregen(comp, duration)
+
+	done := h.pregen.CountReadySegments(id)
+	ready := h.pregen.IsPlaylistComplete(id)
+
+	status := "running"
+	task := h.pregen.GetStatus(id)
+	if task != nil {
+		switch task.Status {
+		case composer.PregenCompleted:
+			if ready {
+				status = "completed"
+			}
+		case composer.PregenFailed:
+			status = "failed"
+		}
+	}
+
+	percent := 0
+	if total > 0 {
+		percent = int(float64(done) / float64(total) * 100)
+		if percent > 100 {
+			percent = 100
+		}
+	}
+
+	resp := map[string]interface{}{
+		"status":  status,
+		"done":    done,
+		"total":   total,
+		"percent": percent,
+		"ready":   ready,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
 // Download 將 fMP4 分段串接為完整 MP4 回傳
 func (h *DownloadHandler) Download(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
@@ -42,7 +98,6 @@ func (h *DownloadHandler) Download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 確保預生成已啟動
 	duration, err := composer.ProbeDuration(comp.Audio.Path)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("無法讀取音檔資訊：%v", err))
@@ -50,15 +105,15 @@ func (h *DownloadHandler) Download(w http.ResponseWriter, r *http.Request) {
 	}
 	h.pregen.StartPregen(comp, duration)
 
-	// 等待預生成完成
-	if err := h.pregen.WaitForPlaylist(id, 300); err != nil {
+	// 等待整個預生成完成（包含 EXT-X-ENDLIST），確保所有分段都已寫出
+	// 依每小時音檔約需數分鐘合成，設 30 分鐘上限
+	if err := h.pregen.WaitForComplete(id, 1800); err != nil {
 		writeError(w, http.StatusServiceUnavailable, fmt.Sprintf("預生成尚未完成：%v", err))
 		return
 	}
 
 	outDir := filepath.Join(h.cfg.TmpDir, id)
 
-	// 收集所有分段檔案
 	initPath := filepath.Join(outDir, "init.mp4")
 	if _, err := os.Stat(initPath); err != nil {
 		writeError(w, http.StatusServiceUnavailable, "init.mp4 尚未就緒")
@@ -71,6 +126,13 @@ func (h *DownloadHandler) Download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 驗證分段數與預期一致
+	expected := composer.SegmentCount(duration, h.cfg.SegmentDuration)
+	if len(segments) < expected {
+		writeError(w, http.StatusServiceUnavailable, fmt.Sprintf("分段不完整（%d/%d）", len(segments), expected))
+		return
+	}
+
 	// 計算總大小
 	var totalSize int64
 	initInfo, _ := os.Stat(initPath)
@@ -80,13 +142,11 @@ func (h *DownloadHandler) Download(w http.ResponseWriter, r *http.Request) {
 		totalSize += info.Size()
 	}
 
-	// 設定回應標頭
-	title := id // 預設用 ID 作為檔名
+	title := id
 	w.Header().Set("Content-Type", "video/mp4")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.mp4"`, sanitizeFilename(title)))
 	w.Header().Set("Content-Length", strconv.FormatInt(totalSize, 10))
 
-	// 串流寫入：init.mp4 + 所有 .m4s
 	initFile, err := os.Open(initPath)
 	if err != nil {
 		return

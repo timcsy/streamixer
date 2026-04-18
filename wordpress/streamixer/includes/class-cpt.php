@@ -119,22 +119,38 @@ class Streamixer_CPT {
 		<?php
 		$files_cleaned = get_post_meta( $post->ID, '_streamixer_files_cleaned', true );
 
+		$check_file = function( $attachment_id ) {
+			if ( ! $attachment_id ) return null;
+			$path = get_attached_file( $attachment_id );
+			return ( $path && file_exists( $path ) );
+		};
+
+		$audio_exists = $check_file( $audio_id );
+		$bg_exists    = $check_file( $background_id );
+		$sub_exists   = $check_file( $subtitle_id );
+
 		$audio_display = $audio_url ? esc_html( basename( $audio_url ) ) : '未選擇';
-		if ( ! $audio_url && $audio_id ) {
-			$saved_name = get_post_meta( $post->ID, '_streamixer_audio_id_filename', true );
-			$audio_display = $saved_name ? esc_html( $saved_name ) . '（已同步，本地已清除）' : '已同步至 Streamixer';
+		if ( ! $audio_id && $files_cleaned ) {
+			$saved_name    = get_post_meta( $post->ID, '_streamixer_audio_id_filename', true );
+			$audio_display = $saved_name ? esc_html( $saved_name ) . '（已同步至 Streamixer，本地已清除）' : '已同步至 Streamixer';
+		} elseif ( $audio_id && ! $audio_exists ) {
+			$audio_display = '⚠ 已選擇但檔案不存在（請重新上傳）';
 		}
 
 		$bg_display = $bg_url ? esc_html( basename( $bg_url ) ) : '未選擇';
-		if ( ! $bg_url && $background_id ) {
+		if ( ! $background_id && $files_cleaned ) {
 			$saved_name = get_post_meta( $post->ID, '_streamixer_background_id_filename', true );
-			$bg_display = $saved_name ? esc_html( $saved_name ) . '（已同步，本地已清除）' : '已同步至 Streamixer';
+			$bg_display = $saved_name ? esc_html( $saved_name ) . '（已同步至 Streamixer，本地已清除）' : '已同步至 Streamixer';
+		} elseif ( $background_id && ! $bg_exists ) {
+			$bg_display = '⚠ 已選擇但檔案不存在（請重新上傳）';
 		}
 
 		$sub_display = $sub_url ? esc_html( basename( $sub_url ) ) : '未選擇';
-		if ( ! $sub_url && $subtitle_id ) {
-			$saved_name = get_post_meta( $post->ID, '_streamixer_subtitle_id_filename', true );
-			$sub_display = $saved_name ? esc_html( $saved_name ) . '（已同步，本地已清除）' : '已同步至 Streamixer';
+		if ( ! $subtitle_id && $files_cleaned ) {
+			$saved_name  = get_post_meta( $post->ID, '_streamixer_subtitle_id_filename', true );
+			$sub_display = $saved_name ? esc_html( $saved_name ) . '（已同步至 Streamixer，本地已清除）' : '未選擇';
+		} elseif ( $subtitle_id && ! $sub_exists ) {
+			$sub_display = '⚠ 已選擇但檔案不存在（請重新上傳）';
 		}
 		?>
 

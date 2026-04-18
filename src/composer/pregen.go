@@ -258,6 +258,42 @@ func (m *PregenManager) IsPlaylistComplete(compositionID string) bool {
 	return strings.Contains(string(data), "#EXT-X-ENDLIST")
 }
 
+// WaitForComplete 等待預生成完整結束（所有分段產生完畢），最多等待 timeoutSec 秒
+func (m *PregenManager) WaitForComplete(compositionID string, timeoutSec int) error {
+	for i := 0; i < timeoutSec*10; i++ {
+		m.mu.RLock()
+		task := m.tasks[compositionID]
+		m.mu.RUnlock()
+		if task != nil {
+			if task.Status == PregenCompleted && m.IsPlaylistComplete(compositionID) {
+				return nil
+			}
+			if task.Status == PregenFailed {
+				return task.Error
+			}
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return fmt.Errorf("等待預生成完成逾時（%d 秒）", timeoutSec)
+}
+
+// CountReadySegments 計算已產生的 .m4s 分段數
+func (m *PregenManager) CountReadySegments(compositionID string) int {
+	outDir := filepath.Join(m.tmpDir, compositionID)
+	entries, err := os.ReadDir(outDir)
+	if err != nil {
+		return 0
+	}
+	count := 0
+	for _, e := range entries {
+		name := e.Name()
+		if strings.HasPrefix(name, "seg_") && strings.HasSuffix(name, ".m4s") {
+			count++
+		}
+	}
+	return count
+}
+
 // GetStatus 取得預生成任務狀態
 func (m *PregenManager) GetStatus(compositionID string) *PregenTask {
 	m.mu.RLock()

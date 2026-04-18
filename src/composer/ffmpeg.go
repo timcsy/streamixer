@@ -20,7 +20,8 @@ func BuildFFmpegArgs(comp *media.MediaComposition, outDir string, segDuration, w
 
 	vf := fmt.Sprintf("scale=%d:%d", width, height)
 	if comp.Subtitle != nil {
-		vf = fmt.Sprintf("subtitles=%s,scale=%d:%d", comp.Subtitle.Path, width, height)
+		// MarginV=30 讓字幕貼近底部但避開控制列，Fontsize=28 放大字體
+		vf = fmt.Sprintf("subtitles=%s:force_style='MarginV=30,Fontsize=28',scale=%d:%d", comp.Subtitle.Path, width, height)
 	}
 
 	args = append(args,
@@ -62,7 +63,8 @@ func BuildSegmentArgs(comp *media.MediaComposition, outPath string, segIndex, se
 
 	vf := fmt.Sprintf("scale=%d:%d", width, height)
 	if comp.Subtitle != nil {
-		vf = fmt.Sprintf("subtitles=%s,scale=%d:%d", comp.Subtitle.Path, width, height)
+		// MarginV=30 讓字幕貼近底部但避開控制列，Fontsize=28 放大字體
+		vf = fmt.Sprintf("subtitles=%s:force_style='MarginV=30,Fontsize=28',scale=%d:%d", comp.Subtitle.Path, width, height)
 	}
 
 	args = append(args,

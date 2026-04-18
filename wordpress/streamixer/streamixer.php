@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Streamixer
  * Description: 將音檔、背景圖片與字幕即時合成為 HLS 影片串流。管理素材組合並在前台播放。
- * Version: 1.0.0
+ * Version: 1.5.0
  * Author: Streamixer
  * Text Domain: streamixer
  * Requires at least: 6.0
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'STREAMIXER_VERSION', '1.0.0' );
+define( 'STREAMIXER_VERSION', '1.5.0' );
 define( 'STREAMIXER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'STREAMIXER_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -99,6 +99,14 @@ add_action( 'init', function() {
 		$wp_post_types['streamixer']->rest_base = 'streamixer';
 	}
 }, 20 );
+
+// 強制 streamixer CPT 使用傳統編輯器（Gutenberg 與 meta box 的 $_POST 不相容）
+add_filter( 'use_block_editor_for_post_type', function( $use, $post_type ) {
+	if ( 'streamixer' === $post_type ) {
+		return false;
+	}
+	return $use;
+}, 10, 2 );
 
 // 在文章編輯器加入「插入 Streamixer」按鈕（傳統編輯器）
 add_action( 'media_buttons', 'streamixer_add_media_button' );
