@@ -68,6 +68,16 @@ func (h *UploadHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// 處理字體指定（字串 form field，非檔案）
+	if font := r.FormValue("font"); font != "" {
+		os.WriteFile(filepath.Join(dir, "font.txt"), []byte(font), 0644)
+		saved = append(saved, "font")
+	} else if _, ok := r.Form["font"]; ok {
+		// 明確送了空字串 → 清除
+		os.Remove(filepath.Join(dir, "font.txt"))
+		saved = append(saved, "font_cleared")
+	}
+
 	if len(saved) == 0 {
 		writeError(w, http.StatusBadRequest, "未收到任何檔案")
 		return

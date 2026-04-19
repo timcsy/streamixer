@@ -7,6 +7,7 @@ import (
 
 	"github.com/timcsy/streamixer/src/composer"
 	"github.com/timcsy/streamixer/src/config"
+	"github.com/timcsy/streamixer/src/fonts"
 	"github.com/timcsy/streamixer/src/handler"
 )
 
@@ -22,10 +23,23 @@ func main() {
 	sweeper := composer.NewSweeper(cache, cfg.CacheSweepInterval)
 	sweeper.Start()
 
+	// 字體管理
+	fontMgr, err := fonts.NewManager(fonts.Config{
+		FontDir:    cfg.FontDir,
+		SymlinkDir: cfg.FontSymlinkDir,
+		SystemDirs: cfg.SystemFontDirs,
+		MaxSize:    cfg.MaxFontSize,
+		MaxCount:   cfg.MaxFontCount,
+	})
+	if err != nil {
+		log.Fatalf("字體管理初始化失敗：%v", err)
+	}
+
 	streamH := handler.NewStreamHandler(cfg, cache)
 	uploadH := handler.NewUploadHandler(cfg)
 	sampleH := handler.NewSampleHandler(cfg)
-	router := handler.SetupRouterWithSweeper(streamH, uploadH, sampleH, cfg, sweeper)
+	fontH := handler.NewFontHandler(fontMgr)
+	router := handler.SetupRouterFull(streamH, uploadH, sampleH, cfg, sweeper, fontH)
 
 	log.Printf("Streamixer 啟動中，port %s，素材目錄 %s", cfg.Port, cfg.MediaDir)
 	log.Printf("快取設定：TTL %v，容量上限 %d bytes，清掃頻率 %v", cfg.CacheTTL, cfg.CacheMaxSize, cfg.CacheSweepInterval)

@@ -5,9 +5,19 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/timcsy/streamixer/src/media"
 )
+
+// buildSubtitleStyle 組裝 ASS force_style，包含 MarginV、Fontsize 與可選 FontName
+func buildSubtitleStyle(fontFamily string) string {
+	parts := []string{"MarginV=30", "Fontsize=28"}
+	if fontFamily != "" {
+		parts = append(parts, "FontName="+fontFamily)
+	}
+	return strings.Join(parts, ",")
+}
 
 // BuildFFmpegArgs 組裝完整 HLS 合成的 FFmpeg 參數（fMP4 格式）
 func BuildFFmpegArgs(comp *media.MediaComposition, outDir string, segDuration, width, height int) []string {
@@ -20,8 +30,7 @@ func BuildFFmpegArgs(comp *media.MediaComposition, outDir string, segDuration, w
 
 	vf := fmt.Sprintf("scale=%d:%d", width, height)
 	if comp.Subtitle != nil {
-		// MarginV=30 讓字幕貼近底部但避開控制列，Fontsize=28 放大字體
-		vf = fmt.Sprintf("subtitles=%s:force_style='MarginV=30,Fontsize=28',scale=%d:%d", comp.Subtitle.Path, width, height)
+		vf = fmt.Sprintf("subtitles=%s:force_style='%s',scale=%d:%d", comp.Subtitle.Path, buildSubtitleStyle(comp.FontFamily), width, height)
 	}
 
 	args = append(args,
@@ -63,8 +72,7 @@ func BuildSegmentArgs(comp *media.MediaComposition, outPath string, segIndex, se
 
 	vf := fmt.Sprintf("scale=%d:%d", width, height)
 	if comp.Subtitle != nil {
-		// MarginV=30 讓字幕貼近底部但避開控制列，Fontsize=28 放大字體
-		vf = fmt.Sprintf("subtitles=%s:force_style='MarginV=30,Fontsize=28',scale=%d:%d", comp.Subtitle.Path, width, height)
+		vf = fmt.Sprintf("subtitles=%s:force_style='%s',scale=%d:%d", comp.Subtitle.Path, buildSubtitleStyle(comp.FontFamily), width, height)
 	}
 
 	args = append(args,

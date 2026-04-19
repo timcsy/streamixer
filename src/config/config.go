@@ -20,6 +20,11 @@ type Config struct {
 	CacheSweepInterval  time.Duration // 清掃頻率
 	APIKey              string        // Upload API 認證金鑰（空字串 = 不認證）
 	CORSOrigins         string        // CORS 允許來源（逗號分隔，* = 全部）
+	FontDir             string        // 使用者字體儲存根目錄（含 user/、default.txt）
+	FontSymlinkDir      string        // 掛進 fontconfig 可見路徑的 symlink 目錄
+	SystemFontDirs      []string      // 系統字體掃描路徑
+	MaxFontSize         int64         // 單一字體檔大小上限（bytes）
+	MaxFontCount        int           // 使用者字體總數上限
 }
 
 // Load 從環境變數載入設定，使用合理預設值
@@ -37,6 +42,11 @@ func Load() Config {
 		CacheSweepInterval:  getDuration("CACHE_SWEEP_INTERVAL", 5*time.Minute),
 		APIKey:              getEnv("API_KEY", ""),
 		CORSOrigins:         getEnv("CORS_ORIGINS", "*"),
+		FontDir:             getEnv("FONT_DIR", "/fonts"),
+		FontSymlinkDir:      getEnv("FONT_SYMLINK_DIR", "/usr/share/fonts/user"),
+		SystemFontDirs:      []string{"/usr/share/fonts"},
+		MaxFontSize:         getInt64("MAX_FONT_SIZE", 10*1024*1024),
+		MaxFontCount:        int(getInt64("MAX_FONT_COUNT", 50)),
 	}
 }
 

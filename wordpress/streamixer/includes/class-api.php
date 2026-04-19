@@ -102,8 +102,14 @@ class Streamixer_API {
 				"1\r\n";
 		}
 
+		// 字體（字串欄位，每次都送以確保清除能生效）
+		$font_meta = get_post_meta( $post_id, '_streamixer_font', true );
+		$body .= "--{$boundary}\r\n" .
+			"Content-Disposition: form-data; name=\"font\"\r\n\r\n" .
+			( is_string( $font_meta ) ? $font_meta : '' ) . "\r\n";
+
 		// 增量同步時若沒有任何新上傳欄位，也跳過（避免空 multipart 被拒）
-		if ( $is_incremental && '' === $body ) {
+		if ( $is_incremental && '' === trim( str_replace( "--{$boundary}", '', $body ) ) ) {
 			return true;
 		}
 
