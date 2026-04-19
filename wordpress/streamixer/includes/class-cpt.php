@@ -5,6 +5,12 @@
 class Streamixer_CPT {
 
 	public static function register() {
+		// Slug 可透過 filter 覆寫（避免與反向代理路徑如 /streamixer 衝突）
+		// 範例：add_filter( 'streamixer_cpt_slug', fn() => 'my-media' );
+		$cpt_slug = apply_filters( 'streamixer_cpt_slug', 'media' );
+		$cat_slug = apply_filters( 'streamixer_category_slug', 'media-category' );
+		$tag_slug = apply_filters( 'streamixer_tag_slug', 'media-tag' );
+
 		// 註冊 CPT
 		register_post_type( 'streamixer', array(
 			'labels'       => array(
@@ -22,7 +28,7 @@ class Streamixer_CPT {
 			),
 			'public'       => true,
 			'has_archive'  => true,
-			'rewrite'      => array( 'slug' => 'streamixer' ),
+			'rewrite'      => array( 'slug' => $cpt_slug ),
 			'supports'     => array( 'title', 'editor', 'thumbnail' ),
 			'menu_icon'    => 'dashicons-format-audio',
 			'show_in_rest' => false,
@@ -38,7 +44,7 @@ class Streamixer_CPT {
 			),
 			'hierarchical' => true,
 			'public'       => true,
-			'rewrite'      => array( 'slug' => 'streamixer-category' ),
+			'rewrite'      => array( 'slug' => $cat_slug ),
 			'show_in_rest' => true,
 		) );
 
@@ -51,7 +57,7 @@ class Streamixer_CPT {
 			),
 			'hierarchical' => false,
 			'public'       => true,
-			'rewrite'      => array( 'slug' => 'streamixer-tag' ),
+			'rewrite'      => array( 'slug' => $tag_slug ),
 			'show_in_rest' => true,
 		) );
 
