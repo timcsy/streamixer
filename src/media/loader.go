@@ -4,16 +4,23 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Loader 負責從檔案系統載入與驗證素材
 type Loader struct {
-	mediaDir string
+	mediaDir        string
+	defaultFontFile string // 全站預設字體檔路徑（空字串則不解析預設）
 }
 
 // NewLoader 建立新的素材載入器
 func NewLoader(mediaDir string) *Loader {
 	return &Loader{mediaDir: mediaDir}
+}
+
+// NewLoaderWithDefaultFont 建立具備全站預設字體解析能力的 Loader
+func NewLoaderWithDefaultFont(mediaDir, defaultFontFile string) *Loader {
+	return &Loader{mediaDir: mediaDir, defaultFontFile: defaultFontFile}
 }
 
 // Load 根據 ID 載入素材組合
@@ -36,6 +43,7 @@ func (l *Loader) Load(id string) (*MediaComposition, error) {
 
 	subtitle := l.findSubtitle(dir)
 	transcript := l.findTranscript(dir)
+	fontFamily := l.readFontFamily(dir)
 
 	return &MediaComposition{
 		ID:         id,
@@ -43,7 +51,25 @@ func (l *Loader) Load(id string) (*MediaComposition, error) {
 		Background: *bg,
 		Subtitle:   subtitle,
 		Transcript: transcript,
+		FontFamily: fontFamily,
 	}, nil
+}
+
+func (l *Loader) readFontFamily(dir string) string {
+	data, err := os.ReadFile(filepath.Join(dir, "font.txt"))
+	if err == nil {
+		if name := strings.TrimSpace(string(data)); name != "" {
+			return name
+		}
+	}
+	if l.defaultFontFile == "" {
+		return ""
+	}
+	data, err = os.ReadFile(l.defaultFontFile)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
 }
 
 func (l *Loader) findAudio(dir string) (*Audio, error) {

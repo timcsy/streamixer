@@ -8,14 +8,14 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o streamixer ./src
 
 FROM alpine:3.19
 
-RUN apk add --no-cache ffmpeg font-noto-cjk
+RUN apk add --no-cache ffmpeg font-noto-cjk fontconfig
 
 COPY --from=builder /app/streamixer /usr/local/bin/streamixer
 COPY static/ /app/static/
 
 WORKDIR /app
 
-RUN mkdir -p /dev/shm/streamixer /media
+RUN mkdir -p /dev/shm/streamixer /media /fonts/user /usr/share/fonts/user
 
 EXPOSE 8080
 

@@ -1,6 +1,6 @@
 # streamixer Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-04-18
+Auto-generated from all feature plans. Last updated: 2026-04-19
 
 ## Active Technologies
 - Go 1.25（既有） + FFmpeg 6.x（既有）、go-chi/chi v5（既有）、golang.org/x/sync/singleflight（新增） (002-instant-seek-pregenerate)
@@ -13,6 +13,7 @@ Auto-generated from all feature plans. Last updated: 2026-04-18
 - mpfs（既有，讀取預生成的分段） (006-video-download)
 - Go 1.25（Streamixer 服務）、PHP 8.0+（WordPress 外掛）、原生 JavaScript（前端 toolbar） + go-chi/chi v5（既有路由）、WordPress 6.0+ Media/Post Meta API（既有）；無新增套件 (007-audio-transcript-download)
 - mpfs（`/dev/shm`）／`/media/{id}/` 目錄；逐字稿檔案以 `transcript.<ext>` 存於素材目錄 (007-audio-transcript-download)
+- Go 1.25（既有）、PHP 8.0+（既有）、原生 JavaScript（WP UI） + go-chi/chi v5（既有路由）、FFmpeg + libass（既有合成管線）、fontconfig（Alpine） (008-subtitle-font-management)
 
 - Go 1.22+ + FFmpeg 6.x（子程序）、go-chi/chi v5（HTTP 路由） (001-hls-stream-synthesis)
 
@@ -33,9 +34,9 @@ tests/
 Go 1.22+: Follow standard conventions
 
 ## Recent Changes
+- 008-subtitle-font-management: Added Go 1.25（既有）、PHP 8.0+（既有）、原生 JavaScript（WP UI） + go-chi/chi v5（既有路由）、FFmpeg + libass（既有合成管線）、fontconfig（Alpine）
 - 007-audio-transcript-download: Added Go 1.25（Streamixer 服務）、PHP 8.0+（WordPress 外掛）、原生 JavaScript（前端 toolbar） + go-chi/chi v5（既有路由）、WordPress 6.0+ Media/Post Meta API（既有）；無新增套件
 - 006-video-download: Added Go 1.25（既有）+ PHP 8.0+（既有 WordPress 外掛） + 無新增（使用標準函式庫 io、os）
-- 005-wordpress-plugin: Added PHP 8.0+、JavaScript（React/JSX for Gutenberg Block） + WordPress 6.0+、hls.js（CDN）、@wordpress/scripts（Block 建置工具）
 
 
 <!-- MANUAL ADDITIONS START -->

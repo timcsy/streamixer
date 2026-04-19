@@ -24,7 +24,7 @@ type StreamHandler struct {
 func NewStreamHandler(cfg config.Config, cache *composer.CacheManager) *StreamHandler {
 	return &StreamHandler{
 		cfg:    cfg,
-		loader: media.NewLoader(cfg.MediaDir),
+		loader: media.NewLoaderWithDefaultFont(cfg.MediaDir, defaultFontFile(cfg)),
 		pregen: composer.NewPregenManager(
 			cfg.TmpDir, cfg.SegmentDuration,
 			cfg.OutputWidth, cfg.OutputHeight,
@@ -33,6 +33,13 @@ func NewStreamHandler(cfg config.Config, cache *composer.CacheManager) *StreamHa
 		),
 		cache: cache,
 	}
+}
+
+func defaultFontFile(cfg config.Config) string {
+	if cfg.FontDir == "" {
+		return ""
+	}
+	return cfg.FontDir + "/default.txt"
 }
 
 // corsMiddleware 設定 CORS 允許來源
@@ -77,6 +84,11 @@ func SetupRouter(h *StreamHandler, uh *UploadHandler, sh *SampleHandler, cfg con
 
 // SetupRouterWithSweeper 同 SetupRouter，但接受 sweeper 以啟用 /config 端點
 func SetupRouterWithSweeper(h *StreamHandler, uh *UploadHandler, sh *SampleHandler, cfg config.Config, sweeper *composer.Sweeper) http.Handler {
+	return SetupRouterFull(h, uh, sh, cfg, sweeper, nil)
+}
+
+// SetupRouterFull 加上 FontHandler
+func SetupRouterFull(h *StreamHandler, uh *UploadHandler, sh *SampleHandler, cfg config.Config, sweeper *composer.Sweeper, fh *FontHandler) http.Handler {
 	r := chi.NewRouter()
 	r.Use(corsMiddleware(cfg.CORSOrigins))
 	r.Get("/health", HealthHandler)
@@ -91,6 +103,19 @@ func SetupRouterWithSweeper(h *StreamHandler, uh *UploadHandler, sh *SampleHandl
 		ch := NewConfigHandler(h.cache, sweeper)
 		r.Get("/config", ch.Get)
 		r.With(authMw).Put("/config", ch.Put)
+	}
+
+	// 字體管理端點
+	if fh != nil {
+		r.Group(func(r chi.Router) {
+			r.Get("/fonts", fh.List)
+			r.Group(func(r chi.Router) {
+				r.Use(authMw)
+				r.Post("/fonts", fh.Upload)
+				r.Put("/fonts/default", fh.SetDefault)
+				r.Delete("/fonts/{id}", fh.Delete)
+			})
+		})
 	}
 
 	r.Get("/compositions", uh.ListCompositions)

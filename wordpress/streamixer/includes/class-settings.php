@@ -321,6 +321,9 @@ class Streamixer_Settings {
 			return;
 		}
 
+		// 處理字體管理操作
+		$font_notice = self::handle_font_actions();
+
 		// 測試連線
 		$connection_status = '';
 		if ( isset( $_GET['test-connection'] ) ) {
@@ -341,6 +344,7 @@ class Streamixer_Settings {
 		<div class="wrap">
 			<h1>Streamixer 設定</h1>
 			<?php echo $connection_status; ?>
+			<?php echo $font_notice; ?>
 			<?php settings_errors(); ?>
 			<form method="post" action="options.php">
 				<?php
@@ -353,7 +357,148 @@ class Streamixer_Settings {
 				<a href="<?php echo admin_url( 'options-general.php?page=streamixer-settings&test-connection=1' ); ?>"
 				   class="button">測試連線</a>
 			</p>
+
+			<?php self::render_font_manager(); ?>
 		</div>
+		<?php
+	}
+
+	/**
+	 * 處理字體上傳／刪除／設預設的表單送出
+	 */
+	public static function handle_font_actions() {
+		if ( ! isset( $_POST['streamixer_font_action'] ) ) {
+			return '';
+		}
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return '';
+		}
+		if ( ! check_admin_referer( 'streamixer_fonts', 'streamixer_fonts_nonce' ) ) {
+			return '';
+		}
+		$action = sanitize_text_field( $_POST['streamixer_font_action'] );
+
+		if ( 'upload' === $action && ! empty( $_FILES['streamixer_font_file']['tmp_name'] ) ) {
+			$file     = $_FILES['streamixer_font_file'];
+			$filename = sanitize_file_name( $file['name'] );
+			$result   = Streamixer_Fonts::upload( $file['tmp_name'], $filename );
+			if ( $result['success'] ) {
+				return '<div class="notice notice-success is-dismissible"><p>✓ 字體上傳成功：' . esc_html( $result['data']['family_name'] ) . '</p></div>';
+			}
+			return '<div class="notice notice-error is-dismissible"><p>字體上傳失敗：' . esc_html( $result['message'] ) . '</p></div>';
+		}
+
+		if ( 'delete' === $action && ! empty( $_POST['font_id'] ) ) {
+			$id     = sanitize_text_field( $_POST['font_id'] );
+			$result = Streamixer_Fonts::delete( $id );
+			if ( $result['success'] ) {
+				return '<div class="notice notice-success is-dismissible"><p>✓ 字體已刪除</p></div>';
+			}
+			return '<div class="notice notice-error is-dismissible"><p>刪除失敗：' . esc_html( $result['message'] ) . '</p></div>';
+		}
+
+		if ( 'set_default' === $action ) {
+			$family = isset( $_POST['family_name'] ) ? sanitize_text_field( $_POST['family_name'] ) : '';
+			$result = Streamixer_Fonts::set_default( $family );
+			if ( $result['success'] ) {
+				update_option( 'streamixer_default_font', $family );
+				return '<div class="notice notice-success is-dismissible"><p>✓ 全站預設字體已更新</p></div>';
+			}
+			return '<div class="notice notice-error is-dismissible"><p>設定失敗：' . esc_html( $result['message'] ) . '</p></div>';
+		}
+		return '';
+	}
+
+	public static function render_font_manager() {
+		$data    = Streamixer_Fonts::fetch_all();
+		$fonts   = $data['fonts'];
+		$default = $data['default_family'];
+		?>
+		<hr>
+		<h2>字體管理</h2>
+		<?php if ( isset( $data['error'] ) ) : ?>
+			<div class="notice notice-warning"><p>無法連線到 Streamixer 後端：<?php echo esc_html( $data['error'] ); ?></p></div>
+			<?php return; ?>
+		<?php endif; ?>
+
+		<form method="post" enctype="multipart/form-data" style="margin-bottom:1em;">
+			<?php wp_nonce_field( 'streamixer_fonts', 'streamixer_fonts_nonce' ); ?>
+			<input type="hidden" name="streamixer_font_action" value="upload">
+			<label><strong>上傳新字體</strong>（.ttf / .otf / .ttc，≤ 10 MB）：</label>
+			<input type="file" name="streamixer_font_file" accept=".ttf,.otf,.ttc" required>
+			<button type="submit" class="button button-primary">上傳</button>
+		</form>
+
+		<form method="post" style="margin-bottom:1em;">
+			<?php wp_nonce_field( 'streamixer_fonts', 'streamixer_fonts_nonce' ); ?>
+			<input type="hidden" name="streamixer_font_action" value="set_default">
+			<label><strong>全站預設字體：</strong></label>
+			<select name="family_name">
+				<option value="">（使用系統預設）</option>
+				<?php foreach ( $fonts as $f ) : ?>
+					<option value="<?php echo esc_attr( $f['family_name'] ); ?>" <?php selected( $default, $f['family_name'] ); ?>>
+						<?php echo esc_html( $f['family_name'] ); ?>
+						（<?php echo $f['source'] === 'system' ? '系統內建' : '使用者上傳'; ?>）
+					</option>
+				<?php endforeach; ?>
+			</select>
+			<button type="submit" class="button">設為預設</button>
+		</form>
+
+		<table class="widefat striped" style="max-width:800px;">
+			<thead>
+				<tr>
+					<th>字體名稱</th>
+					<th>來源</th>
+					<th>檔案大小</th>
+					<th>操作</th>
+				</tr>
+			</thead>
+			<tbody>
+				<?php foreach ( $fonts as $f ) : ?>
+					<?php
+					$is_user = ( 'user' === $f['source'] );
+					$using   = $is_user ? Streamixer_Fonts::compositions_using( $f['family_name'] ) : array();
+					$size_mb = round( $f['size'] / 1048576, 2 );
+					?>
+					<tr>
+						<td>
+							<?php echo esc_html( $f['family_name'] ); ?>
+							<?php if ( $default === $f['family_name'] ) : ?>
+								<span style="color:#2271b1;">(預設)</span>
+							<?php endif; ?>
+						</td>
+						<td><?php echo $is_user ? '使用者上傳' : '系統內建'; ?></td>
+						<td><?php echo $size_mb; ?> MB</td>
+						<td>
+							<?php if ( $is_user ) : ?>
+								<form method="post" style="display:inline;" onsubmit="return streamixerConfirmDelete(this, <?php echo count( $using ); ?>, '<?php echo esc_js( implode( '、', wp_list_pluck( $using, 'title' ) ) ); ?>');">
+									<?php wp_nonce_field( 'streamixer_fonts', 'streamixer_fonts_nonce' ); ?>
+									<input type="hidden" name="streamixer_font_action" value="delete">
+									<input type="hidden" name="font_id" value="<?php echo esc_attr( $f['id'] ); ?>">
+									<button type="submit" class="button-link-delete">刪除</button>
+								</form>
+								<?php if ( ! empty( $using ) ) : ?>
+									<br><small style="color:#d63638;">⚠ <?php echo count( $using ); ?> 個素材指定此字體</small>
+								<?php endif; ?>
+							<?php else : ?>
+								<span style="color:#999;">系統字體（不可刪除）</span>
+							<?php endif; ?>
+						</td>
+					</tr>
+				<?php endforeach; ?>
+			</tbody>
+		</table>
+
+		<script>
+		function streamixerConfirmDelete(form, usingCount, titles) {
+			var msg = '確定要刪除此字體？';
+			if (usingCount > 0) {
+				msg = '此字體目前被 ' + usingCount + ' 個素材使用：\n' + titles + '\n\n刪除後這些素材下次合成會改用全站預設字體。確定繼續？';
+			}
+			return confirm(msg);
+		}
+		</script>
 		<?php
 	}
 }

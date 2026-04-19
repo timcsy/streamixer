@@ -5,6 +5,7 @@ services:
       - "8081:8080"
     volumes:
       - streamixer-media:/media
+      - streamixer-fonts:/fonts
     tmpfs:
       - /dev/shm/streamixer:size=512M
     environment:
@@ -13,7 +14,10 @@ services:
       - PORT=8080
       - CACHE_TTL=30m
       - CACHE_SWEEP_INTERVAL=5m
+      - FONT_DIR=/fonts
+      - FONT_SYMLINK_DIR=/usr/share/fonts/user
     restart: unless-stopped
 
 volumes:
   streamixer-media:
+  streamixer-fonts:

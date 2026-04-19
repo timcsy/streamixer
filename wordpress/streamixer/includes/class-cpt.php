@@ -202,6 +202,23 @@ class Streamixer_CPT {
 			<div class="streamixer-preview" id="streamixer_transcript_preview"><?php echo $transcript_display; ?></div>
 		</div>
 
+		<?php
+		$font_family = get_post_meta( $post->ID, '_streamixer_font', true );
+		$fonts_data  = Streamixer_Fonts::fetch_all();
+		?>
+		<div class="streamixer-field">
+			<label>字體</label>
+			<select name="streamixer_font">
+				<option value="">使用全站預設<?php echo $fonts_data['default_family'] ? '（' . esc_html( $fonts_data['default_family'] ) . '）' : ''; ?></option>
+				<?php foreach ( $fonts_data['fonts'] as $f ) : ?>
+					<option value="<?php echo esc_attr( $f['family_name'] ); ?>" <?php selected( $font_family, $f['family_name'] ); ?>>
+						<?php echo esc_html( $f['family_name'] ); ?>
+					</option>
+				<?php endforeach; ?>
+			</select>
+			<p class="streamixer-preview">留空或選「使用全站預設」時，該素材字幕會套用 Streamixer 設定頁的全站預設字體。</p>
+		</div>
+
 		<?php if ( $sync_status ) : ?>
 		<div class="streamixer-sync-status <?php echo esc_attr( $sync_status ); ?>">
 			<?php
@@ -274,6 +291,12 @@ class Streamixer_CPT {
 		foreach ( $fields as $field ) {
 			$value = isset( $_POST[ $field ] ) ? intval( $_POST[ $field ] ) : 0;
 			update_post_meta( $post_id, '_' . $field, $value );
+		}
+
+		// 字體（字串）
+		if ( isset( $_POST['streamixer_font'] ) ) {
+			$font_value = sanitize_text_field( $_POST['streamixer_font'] );
+			update_post_meta( $post_id, '_streamixer_font', $font_value );
 		}
 
 		// 同步至 Streamixer
