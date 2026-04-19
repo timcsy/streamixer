@@ -45,7 +45,7 @@ func Load() Config {
 		FontDir:             getEnv("FONT_DIR", "/fonts"),
 		FontSymlinkDir:      getEnv("FONT_SYMLINK_DIR", "/usr/share/fonts/user"),
 		SystemFontDirs:      []string{"/usr/share/fonts"},
-		MaxFontSize:         getInt64("MAX_FONT_SIZE", 10*1024*1024),
+		MaxFontSize:         getInt64("MAX_FONT_SIZE", 50*1024*1024),
 		MaxFontCount:        int(getInt64("MAX_FONT_COUNT", 50)),
 	}
 }

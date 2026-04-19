@@ -42,7 +42,7 @@ type Config struct {
 	MaxCount    int
 }
 
-// NewManager 建立字體管理器，同時確保目錄存在
+// NewManager 建立字體管理器，同時確保目錄存在並同步 symlinks
 func NewManager(cfg Config) (*Manager, error) {
 	userDir := filepath.Join(cfg.FontDir, "user")
 	if err := os.MkdirAll(userDir, 0755); err != nil {
@@ -51,14 +51,39 @@ func NewManager(cfg Config) (*Manager, error) {
 	if cfg.SymlinkDir != "" {
 		_ = os.MkdirAll(cfg.SymlinkDir, 0755)
 	}
-	return &Manager{
+	m := &Manager{
 		userDir:     userDir,
 		defaultFile: filepath.Join(cfg.FontDir, "default.txt"),
 		symlinkDir:  cfg.SymlinkDir,
 		systemDirs:  cfg.SystemDirs,
 		maxSize:     cfg.MaxSize,
 		maxCount:    cfg.MaxCount,
-	}, nil
+	}
+	// 啟動時重建 symlinks：容器重啟後 /usr/share/fonts/user 會被重置，
+	// 確保所有 /fonts/user/*.ttf 都 symlink 到 fontconfig 看得到的路徑
+	m.rebuildSymlinks()
+	return m, nil
+}
+
+// rebuildSymlinks 掃描使用者字體檔並重建 symlink 到 fontconfig path
+func (m *Manager) rebuildSymlinks() {
+	if m.symlinkDir == "" {
+		return
+	}
+	entries, err := os.ReadDir(m.userDir)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		name := e.Name()
+		if strings.HasSuffix(name, ".json") {
+			continue
+		}
+		src := filepath.Join(m.userDir, name)
+		dst := filepath.Join(m.symlinkDir, name)
+		os.Remove(dst)
+		os.Symlink(src, dst)
+	}
 }
 
 // List 合併系統與使用者字體；系統在前，各組內按 family name 升序

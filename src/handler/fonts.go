@@ -36,7 +36,7 @@ func (h *FontHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // Upload POST /fonts
 func (h *FontHandler) Upload(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(15 << 20); err != nil {
+	if err := r.ParseMultipartForm(60 << 20); err != nil {
 		writeError(w, http.StatusBadRequest, "multipart 解析失敗："+err.Error())
 		return
 	}

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Streamixer
  * Description: 將音檔、背景圖片與字幕即時合成為 HLS 影片串流。管理素材組合並在前台播放。
- * Version: 1.7.0
+ * Version: 1.7.1
  * Author: Streamixer
  * Text Domain: streamixer
  * Requires at least: 6.0
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'STREAMIXER_VERSION', '1.7.0' );
+define( 'STREAMIXER_VERSION', '1.7.1' );
 define( 'STREAMIXER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'STREAMIXER_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 

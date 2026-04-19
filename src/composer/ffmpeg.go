@@ -10,9 +10,22 @@ import (
 	"github.com/timcsy/streamixer/src/media"
 )
 
-// buildSubtitleStyle 組裝 ASS force_style，包含 MarginV、Fontsize 與可選 FontName
+// buildSubtitleStyle 組裝 ASS force_style
+// 視覺：白字 + 半透明黑色背景框（無外框、無陰影）
+// BorderStyle=3：實心背景框；Outline/Shadow=0：無邊無影
+// BackColour=&H80000000：ASS 格式 AABBGGRR，alpha=0x80 ≈ 50% 透明、黑色
+// PrimaryColour=&H00FFFFFF：不透明白字
 func buildSubtitleStyle(fontFamily string) string {
-	parts := []string{"MarginV=30", "Fontsize=28"}
+	// BorderStyle=3 實心背景框，Outline 作為框的內邊距（需 > 0 才會可見）
+	parts := []string{
+		"MarginV=30",
+		"Fontsize=28",
+		"PrimaryColour=&H00FFFFFF",
+		"BackColour=&HAA000000",
+		"BorderStyle=3",
+		"Outline=4",
+		"Shadow=0",
+	}
 	if fontFamily != "" {
 		parts = append(parts, "FontName="+fontFamily)
 	}
@@ -30,7 +43,14 @@ func BuildFFmpegArgs(comp *media.MediaComposition, outDir string, segDuration, w
 
 	vf := fmt.Sprintf("scale=%d:%d", width, height)
 	if comp.Subtitle != nil {
-		vf = fmt.Sprintf("subtitles=%s:force_style='%s',scale=%d:%d", comp.Subtitle.Path, buildSubtitleStyle(comp.FontFamily), width, height)
+		subPath := comp.Subtitle.Path
+		if ass, err := writeWrapperASS(comp.Subtitle.Path, outDir, comp.FontFamily, width, height); err == nil {
+			subPath = ass
+		}
+		// drawbox 在字幕區繪製半透明黑底條（y 約對應 ASS MarginV=60 + Fontsize=60 的區域）
+		// h=140 涵蓋單/雙行字幕；color=black@0.5 為 50% 透明黑
+		boxY := height - 160
+		vf = fmt.Sprintf("scale=%d:%d,drawbox=x=0:y=%d:w=%d:h=140:color=black@0.5:t=fill,subtitles=%s:fontsdir=/usr/share/fonts/user", width, height, boxY, width, subPath)
 	}
 
 	args = append(args,
@@ -72,7 +92,14 @@ func BuildSegmentArgs(comp *media.MediaComposition, outPath string, segIndex, se
 
 	vf := fmt.Sprintf("scale=%d:%d", width, height)
 	if comp.Subtitle != nil {
-		vf = fmt.Sprintf("subtitles=%s:force_style='%s',scale=%d:%d", comp.Subtitle.Path, buildSubtitleStyle(comp.FontFamily), width, height)
+		subPath := comp.Subtitle.Path
+		if ass, err := writeWrapperASS(comp.Subtitle.Path, filepath.Dir(outPath), comp.FontFamily, width, height); err == nil {
+			subPath = ass
+		}
+		// drawbox 在字幕區繪製半透明黑底條（y 約對應 ASS MarginV=60 + Fontsize=60 的區域）
+		// h=140 涵蓋單/雙行字幕；color=black@0.5 為 50% 透明黑
+		boxY := height - 160
+		vf = fmt.Sprintf("scale=%d:%d,drawbox=x=0:y=%d:w=%d:h=140:color=black@0.5:t=fill,subtitles=%s:fontsdir=/usr/share/fonts/user", width, height, boxY, width, subPath)
 	}
 
 	args = append(args,
